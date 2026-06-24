@@ -54,7 +54,7 @@ app.post('/api/payment/webhook', async (req, res) => {
 });
 
 // Render ứng dụng React cho mọi route không phải API
-app.get('*', (req, res) => {
+app.use((req, res) => {
     res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
 
