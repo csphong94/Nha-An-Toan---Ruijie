@@ -28,9 +28,41 @@ function App() {
         const loginUrl = urlParams.get('login_url');
         if (loginUrl) {
           setStatus('Đang cấp quyền mạng...');
-          // Chuyển hướng về cục phát Ruijie kèm theo phương thức Pass (One-click)
-          // Có thể Ruijie yêu cầu user/password, nếu vậy chúng ta truyền user rỗng
-          window.location.href = `${loginUrl}?auth_type=pass`;
+          
+          // Ruijie ext_login thường yêu cầu phương thức POST kèm theo toàn bộ tham số cũ
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = loginUrl;
+
+          // Truyền lại toàn bộ tham số cũ (nas_mac, client_mac, ssid...)
+          for (const [key, value] of urlParams.entries()) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = value;
+            form.appendChild(input);
+          }
+
+          // Thêm các tham số xác thực có thể Ruijie đang mong đợi
+          const extraParams = {
+            auth_type: 'pass',
+            authType: 'pass',
+            user: 'guest',
+            username: 'guest',
+            password: 'guest'
+          };
+
+          for (const [key, value] of Object.entries(extraParams)) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = value;
+            form.appendChild(input);
+          }
+
+          document.body.appendChild(form);
+          form.submit();
+
         } else {
           setStatus('Thành công! Đã mở khóa mạng.');
         }
