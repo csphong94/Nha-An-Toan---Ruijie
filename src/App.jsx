@@ -95,9 +95,15 @@ function App() {
         <button className="btn btn-free" onClick={() => handleFreeAuth()} disabled={loading}>
           {loading ? 'Đang kết nối...' : 'Dùng Miễn Phí (5Mbps)'}
         </button>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
+        <p className="text-gray-400 text-sm mt-4 text-center">
           Tốc độ cơ bản, có thể chậm khi tải video.
         </p>
+      </div>
+
+      {/* Debug Info for Developer */}
+      <div className="mt-8 p-4 bg-gray-800 rounded-lg text-xs text-gray-400 break-all border border-gray-700">
+        <p className="font-bold text-gray-300 mb-1">🛠 Debug Info (Gửi ảnh này cho Dev):</p>
+        <p>{window.location.search}</p>
       </div>
     </div>
   );
