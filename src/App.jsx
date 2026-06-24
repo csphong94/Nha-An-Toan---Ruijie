@@ -12,24 +12,65 @@ function App() {
 
   const handleFreeAuth = async () => {
     setLoading(true);
+    setStatus('Đang kết nối...');
+
     try {
       const res = await fetch('/api/auth/free', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mac: macAddress })
+        body: JSON.stringify({ mac: realMac })
       });
       const data = await res.json();
+      
       if (data.success) {
-        setCurrentView('status');
+        // [CỐT LÕI] Bắn tín hiệu sang cục phát Ruijie qua đường link login_url
+        const loginUrl = urlParams.get('login_url');
+        if (loginUrl) {
+          setStatus('Đang cấp quyền mạng...');
+          // Chuyển hướng về cục phát Ruijie kèm theo phương thức Pass (One-click)
+          // Có thể Ruijie yêu cầu user/password, nếu vậy chúng ta truyền user rỗng
+          window.location.href = `${loginUrl}?auth_type=pass`;
+        } else {
+          setStatus('Thành công! Đã mở khóa mạng.');
+        }
       } else {
-        alert('Lỗi kết nối Ruijie!');
+        setStatus('Lỗi: ' + data.message);
       }
     } catch (err) {
-      console.error(err);
-      alert('Không thể kết nối đến máy chủ Backend.');
+      setStatus('Lỗi kết nối máy chủ');
     }
     setLoading(false);
   };
+
+  const handleVipAuth = async () => {
+    // ... logic VIP (bỏ qua cập nhật chi tiết trong demo, sẽ làm tương tự)
+    setStatus('Đang chuyển hướng sang MoMo...');
+    try {
+      const res = await fetch('/api/payment/momo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mac: realMac, amount: 10000 })
+      });
+      const data = await res.json();
+      if (data.payUrl) {
+        window.location.href = data.payUrl;
+      }
+    } catch (err) {
+      setStatus('Lỗi tạo thanh toán MoMo');
+    }
+  };
+
+  if (status) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white p-4">
+        <div className="bg-gray-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center border border-gray-700">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <h2 className="text-xl font-bold mb-2">{status}</h2>
+          <p className="text-gray-400 text-sm">Vui lòng chờ trong giây lát...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleVIPSelect = () => {
     setCurrentView('payment');
