@@ -4,6 +4,7 @@ import './index.css';
 function App() {
   const [currentView, setCurrentView] = useState('login'); // 'login', 'payment', 'status'
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState(null);
   
   // Lấy MAC thật từ URL do Ruijie gán vào (ví dụ: ?mac=AA:BB:CC...)
   const urlParams = new URLSearchParams(window.location.search);
