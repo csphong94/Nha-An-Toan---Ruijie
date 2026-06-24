@@ -4,7 +4,11 @@ import './index.css';
 function App() {
   const [currentView, setCurrentView] = useState('login'); // 'login', 'payment', 'status'
   const [loading, setLoading] = useState(false);
-  const [macAddress] = useState('AA:BB:CC:11:22:33'); // Giả lập MAC lấy từ URL
+  
+  // Lấy MAC thật từ URL do Ruijie gán vào (ví dụ: ?mac=AA:BB:CC...)
+  const urlParams = new URLSearchParams(window.location.search);
+  const realMac = urlParams.get('mac') || urlParams.get('client_mac') || 'UNKNOWN_MAC';
+  const [macAddress] = useState(realMac);
 
   const handleFreeAuth = async () => {
     setLoading(true);
