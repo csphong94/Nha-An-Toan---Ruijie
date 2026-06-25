@@ -18,12 +18,25 @@ app.use(express.static(path.join(__dirname, '../dist')));
 app.get('/api/debug/ruijie-groups', async (req, res) => {
     try {
         const netGroups = await getNetworkGroups();
-        if (!netGroups || netGroups.length === 0) {
-            return res.json({ error: 'Không tìm thấy Network Group nào.' });
+        if (!netGroups) {
+            return res.json({ error: 'Không lấy được Network Group nào.', raw: netGroups });
         }
         
-        // Mặc định lấy groupId của mạng đầu tiên để test
-        const firstGroupId = netGroups[0].id;
+        // Cố gắng tìm Group ID đầu tiên, nếu có mảng thì lấy phần tử 0
+        let firstGroupId = null;
+        if (Array.isArray(netGroups) && netGroups.length > 0) {
+            firstGroupId = netGroups[0].id || netGroups[0].groupId;
+        } else if (netGroups.groupId) {
+            firstGroupId = netGroups.groupId;
+        }
+
+        if (!firstGroupId) {
+            // Nếu vẫn không tìm thấy, trả về toàn bộ dữ liệu thô để debug
+            return res.json({ 
+                error: 'Không tìm thấy cấu trúc ID phù hợp.', 
+                rawNetworkGroups: netGroups 
+            });
+        }
         
         const userGroups = await getUserGroups(firstGroupId);
         
