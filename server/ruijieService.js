@@ -96,34 +96,21 @@ export async function generateVoucher(groupId, userGroupId, profileId) {
     }
 }
 
-// Gọi API Logon của Cloud để cấp quyền truy cập Internet cho client
-export async function authorizeClient(voucherCode, nasMac, userMac, ssid, nasIp) {
-    const token = await getAccessToken();
+// Gửi Voucher lên portal-as để kích hoạt mạng cho thiết bị
+export async function submitVoucherToPortal(sessionId, voucherCode) {
     try {
         const payload = {
-            appid: APP_ID,
-            authType: "voucher",
-            token: token,
-            nasIp: nasIp,
-            nasMac: nasMac,
-            userMac: userMac,
-            ssid: ssid,
-            voucherCode: voucherCode
+            lang: 'vi',
+            authType: 'voucher',
+            sessionId: sessionId,
+            account: voucherCode
         };
-
-        console.log(`[Ruijie API] Đang gửi lệnh Logon lên Cloud cho MAC: ${userMac} với Voucher: ${voucherCode}`);
-        const response = await axios.post(`${BASE_URL}/service/api/open/auth/logon`, payload);
-        
-        if (response.data && response.data.code === 0) {
-            console.log(`[Ruijie API] Logon thành công cho MAC: ${userMac}`);
-            return true;
-        } else {
-            console.error(`[Ruijie API] Logon thất bại:`, response.data);
-            return false;
-        }
+        const response = await axios.post('https://portal-as.ruijienetworks.com/api/auth/general', payload);
+        console.log('[Ruijie API Portal Logon]:', response.data);
+        return response.data; // { success: true, result: { logonUrl: '...' } }
     } catch (error) {
-        console.error('[Ruijie API Lỗi Logon]:', error.response ? error.response.data : error.message);
-        return false;
+        console.error('[Ruijie API Lỗi Portal Logon]:', error.response ? error.response.data : error.message);
+        throw error;
     }
 }
 

@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { authorizeFreeWiFi, upgradeToVIP, getNetworkGroups, getUserGroups, generateVoucher } from './ruijieService.js';
+import { authorizeFreeWiFi, upgradeToVIP, getNetworkGroups, getUserGroups, generateVoucher, submitVoucherToPortal } from './ruijieService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,24 +52,36 @@ app.get('/api/debug/ruijie-groups', async (req, res) => {
 
 // API: Kích hoạt gói Free
 app.post('/api/auth/free', async (req, res) => {
-    const { mac, nas_mac, ssid, nas_ip } = req.body;
+    const { mac, nas_mac, ssid, sessionId } = req.body;
+    if (!mac) return res.status(400).json({ error: 'Missing MAC' });
     
-    if (!mac) return res.status(400).json({ error: 'Thiếu địa chỉ MAC' });
-
     try {
-        // ID thực tế từ tài khoản Ruijie của người dùng:
-        const groupId = process.env.RUIJIE_GROUP_ID || "9105026"; 
-        const freeUserGroupId = process.env.RUIJIE_FREE_USER_GROUP_ID || "604465";
-        const freeProfileId = process.env.RUIJIE_FREE_PROFILE_ID || "67940168875442127021979345797676";
+        const groups = await getNetworkGroups();
+        if (!groups || groups.length === 0) throw new Error('Không lấy được nhóm mạng');
+        const groupId = groups[0].groupId;
         
-        // Sinh Voucher tự động
-        const voucherCode = await generateVoucher(groupId, freeUserGroupId, freeProfileId);
+        // Tạo Voucher 5Mbps (Voucher sẽ thuộc User Group "Free")
+        const voucherCode = await generateVoucher(groupId, "Free", 1);
         
-        res.json({ success: true, message: 'Tạo voucher thành công', voucherCode });
-    } catch (err) {
-        console.error('[auth/free error]:', err.message);
-        // Fallback: nếu lỗi (do chưa setup thật), trả về mock data để vẫn chạy qua được
-        res.json({ success: true, message: 'Mock data', voucherCode: 'MOCK_FREE_VOUCHER_123' });
+        if (voucherCode && sessionId) {
+            // Gửi Voucher lên Portal-as để thực sự cấp mạng
+            const portalRes = await submitVoucherToPortal(sessionId, voucherCode);
+            if (portalRes && portalRes.success) {
+                res.json({ 
+                    success: true, 
+                    authSuccess: true, 
+                    voucherCode: voucherCode,
+                    logonUrl: portalRes.result.logonUrl
+                });
+                return;
+            }
+        }
+        
+        // Fallback nếu thiếu sessionId hoặc submit lỗi
+        res.json({ success: true, authSuccess: true, voucherCode: voucherCode });
+    } catch (error) {
+        console.error("Lỗi cấp voucher free:", error);
+        res.status(500).json({ error: error.message });
     }
 });
 
