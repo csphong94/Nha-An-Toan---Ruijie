@@ -31,9 +31,13 @@ function App() {
       const data = await res.json();
       
       if (data.authSuccess) {
-        if (data.logonUrl) {
-          setStatus('Thành công! Đang chuyển hướng...');
-          window.location.href = data.logonUrl;
+        // Lấy return_url (link trang customHtml của Ruijie)
+        const returnUrl = urlParams.get('return_url');
+        if (returnUrl) {
+          setStatus('Thành công! Đang xử lý cấp mạng...');
+          // Redirect khách hàng trở lại customHtml của Ruijie, kèm theo voucherCode
+          const separator = returnUrl.includes('?') ? '&' : '?';
+          window.location.href = decodeURIComponent(returnUrl) + separator + 'voucher=' + data.voucherCode;
         } else {
           setStatus('Thành công! Đã cấp phát Voucher.');
         }

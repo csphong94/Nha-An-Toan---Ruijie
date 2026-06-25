@@ -2,28 +2,60 @@
 <html>
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-
-    <title></title>
+    <title>Đang xử lý kết nối...</title>
     <meta name="viewport" content="initial-scale=1.0" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta http-equiv="Expires" content="0" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Cache-Control" content="no-cache" />
     <meta http-equiv="Cache" content="no-cache" />
-
     <link rel="icon" href="./img/favicon.ico" />
     <link rel="stylesheet" type="text/css" href="./css/index.css" />
   </head>
-
-  <body>
+  <body style="background-color: #111827; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif;">
+    <p id="statusMsg">Đang chuẩn bị hệ thống mạng an toàn...</p>
+    <script type="text/javascript" src="./js/jquery/jquery.min.js"></script>
     <script type="text/javascript">
       window.onload = function() {
-        var searchParams = window.location.search;
-        window.location.replace("https://nha-an-toan-ruijie.onrender.com/" + searchParams);
+        var urlParams = new URLSearchParams(window.location.search);
+        var voucherCode = urlParams.get('voucher');
+        var sessionId = urlParams.get('sessionId');
+        
+        if (voucherCode && sessionId) {
+          // Khách hàng vừa lấy Voucher từ Render xong và được ném về đây
+          document.getElementById('statusMsg').innerText = "Đang cấp phát băng thông 5Mbps...";
+          var paramObj = {
+            lang: 'vi',
+            authType: 'voucher',
+            sessionId: sessionId,
+            account: voucherCode
+          };
+          $.post({
+            url: "/api/auth/general",
+            data: JSON.stringify(paramObj),
+            contentType: "application/json;charset=utf-8",
+            success: function(res) {
+              if (res.success && res.result && res.result.logonUrl) {
+                document.getElementById('statusMsg').innerText = "Thành công! Đang vào mạng...";
+                window.location.replace(res.result.logonUrl);
+              } else {
+                document.getElementById('statusMsg').innerText = "Lỗi cấp mạng: " + (res.message || "Không xác định");
+              }
+            },
+            error: function() {
+              document.getElementById('statusMsg').innerText = "Lỗi kết nối đến máy chủ Ruijie!";
+            }
+          });
+        } else {
+          // Khách hàng mới vào, ném sang Render để bấm "Dùng Miễn Phí"
+          // Lấy URL hiện tại (xóa tham số rác nếu có) làm return_url để Render biết đường ném về
+          var currentHref = window.location.href.split('#')[0];
+          var returnUrl = encodeURIComponent(currentHref);
+          var searchParams = window.location.search;
+          var separator = searchParams ? "&" : "?";
+          window.location.replace("https://nha-an-toan-ruijie.onrender.com/" + searchParams + separator + "return_url=" + returnUrl);
+        }
       };
     </script>
-    <div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; background-color: #111827; color: white;">
-      <p>Đang chuyển hướng đến hệ thống mạng an toàn...</p>
-    </div>
   </body>
 </html>

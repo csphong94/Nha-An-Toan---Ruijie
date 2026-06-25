@@ -83,21 +83,7 @@ app.post('/api/auth/free', async (req, res) => {
         // Tạo Voucher 5Mbps (Voucher sẽ thuộc User Group "Free")
         const voucherCode = await generateVoucher(groupId, freeUserGroupId, freeProfileId);
         
-        if (voucherCode && sessionId) {
-            // Gửi Voucher lên Portal-as để thực sự cấp mạng
-            const portalRes = await submitVoucherToPortal(sessionId, voucherCode);
-            if (portalRes && portalRes.success) {
-                res.json({ 
-                    success: true, 
-                    authSuccess: true, 
-                    voucherCode: voucherCode,
-                    logonUrl: portalRes.result.logonUrl
-                });
-                return;
-            }
-        }
-        
-        // Fallback nếu thiếu sessionId hoặc submit lỗi
+        // Trả về Voucher Code để Frontend redirect quay lại customHtml
         res.json({ success: true, authSuccess: true, voucherCode: voucherCode });
     } catch (error) {
         console.error("Lỗi cấp voucher free:", error);
