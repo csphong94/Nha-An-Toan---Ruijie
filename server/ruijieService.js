@@ -91,8 +91,39 @@ export async function generateVoucher(groupId, userGroupId, profileId) {
         }
         throw new Error('Lỗi tạo Voucher: ' + JSON.stringify(response.data));
     } catch (error) {
-        console.error('[Ruijie API Lỗi tạo Voucher]:', error.message);
+        console.error('[Ruijie API Lỗi tạo Voucher]:', error.response ? error.response.data : error.message);
         throw error;
+    }
+}
+
+// Gọi API Logon của Cloud để cấp quyền truy cập Internet cho client
+export async function authorizeClient(voucherCode, nasMac, userMac, ssid, nasIp) {
+    const token = await getAccessToken();
+    try {
+        const payload = {
+            appid: APP_ID,
+            authType: "voucher",
+            token: token,
+            nasIp: nasIp,
+            nasMac: nasMac,
+            userMac: userMac,
+            ssid: ssid,
+            voucherCode: voucherCode
+        };
+
+        console.log(`[Ruijie API] Đang gửi lệnh Logon lên Cloud cho MAC: ${userMac} với Voucher: ${voucherCode}`);
+        const response = await axios.post(`${BASE_URL}/service/api/open/auth/logon`, payload);
+        
+        if (response.data && response.data.code === 0) {
+            console.log(`[Ruijie API] Logon thành công cho MAC: ${userMac}`);
+            return true;
+        } else {
+            console.error(`[Ruijie API] Logon thất bại:`, response.data);
+            return false;
+        }
+    } catch (error) {
+        console.error('[Ruijie API Lỗi Logon]:', error.response ? error.response.data : error.message);
+        return false;
     }
 }
 

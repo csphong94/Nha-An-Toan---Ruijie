@@ -19,53 +19,58 @@ function App() {
       const res = await fetch('/api/auth/free', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mac: realMac })
+        body: JSON.stringify({ 
+          mac: realMac, 
+          nas_mac: urlParams.get('nas_mac'),
+          ssid: urlParams.get('ssid'),
+          nas_ip: urlParams.get('nas_ip') 
+        })
       });
       const data = await res.json();
       
       if (data.success) {
-        // [CỐT LÕI] Bắn tín hiệu sang cục phát Ruijie qua đường link login_url
-        const loginUrl = urlParams.get('login_url');
-        if (loginUrl) {
-          setStatus('Đang cấp quyền mạng...');
-          
-          // Ruijie ext_login thường yêu cầu phương thức POST kèm theo toàn bộ tham số cũ
-          const form = document.createElement('form');
-          form.method = 'POST';
-          form.action = loginUrl;
-
-          // Truyền lại toàn bộ tham số cũ (nas_mac, client_mac, ssid...)
-          for (const [key, value] of urlParams.entries()) {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = key;
-            input.value = value;
-            form.appendChild(input);
-          }
-
-          // Thêm các tham số xác thực Voucher mà Ruijie đang mong đợi
-          const extraParams = {
-            auth_type: 'voucher',
-            authType: 'voucher',
-            user: data.voucherCode || 'guest',
-            username: data.voucherCode || 'guest',
-            password: data.voucherCode || 'guest',
-            account: data.voucherCode || 'guest'
-          };
-
-          for (const [key, value] of Object.entries(extraParams)) {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = key;
-            input.value = value;
-            form.appendChild(input);
-          }
-
-          document.body.appendChild(form);
-          form.submit();
-
+        if (data.authSuccess) {
+          // Logon Cloud thành công, Ruijie Cloud đã ép cục phát thả mạng!
+          setCurrentView('status');
         } else {
-          setStatus('Thành công! Đã mở khóa mạng.');
+          // Dự phòng: Nếu Cloud lỗi, thử ép đăng nhập cục bộ qua ext_login
+          const loginUrl = urlParams.get('login_url');
+          if (loginUrl) {
+            setStatus('Đang cấp quyền mạng cục bộ...');
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = loginUrl;
+
+            for (const [key, value] of urlParams.entries()) {
+              const input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = key;
+              input.value = value;
+              form.appendChild(input);
+            }
+
+            const extraParams = {
+              auth_type: 'voucher',
+              authType: 'voucher',
+              user: data.voucherCode || 'guest',
+              username: data.voucherCode || 'guest',
+              password: data.voucherCode || 'guest',
+              account: data.voucherCode || 'guest'
+            };
+
+            for (const [key, value] of Object.entries(extraParams)) {
+              const input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = key;
+              input.value = value;
+              form.appendChild(input);
+            }
+
+            document.body.appendChild(form);
+            form.submit();
+          } else {
+            setCurrentView('status');
+          }
         }
       } else {
         setStatus('Lỗi: ' + data.message);

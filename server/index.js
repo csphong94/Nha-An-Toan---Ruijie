@@ -50,9 +50,10 @@ app.get('/api/debug/ruijie-groups', async (req, res) => {
     }
 });
 
-// API: Khách hàng chọn gói Free
+// API: Kích hoạt gói Free
 app.post('/api/auth/free', async (req, res) => {
-    const { mac } = req.body;
+    const { mac, nas_mac, ssid, nas_ip } = req.body;
+    
     if (!mac) return res.status(400).json({ error: 'Thiếu địa chỉ MAC' });
 
     try {
@@ -64,11 +65,22 @@ app.post('/api/auth/free', async (req, res) => {
         // Sinh Voucher tự động
         const voucherCode = await generateVoucher(groupId, freeUserGroupId, freeProfileId);
         
-        res.json({ success: true, message: 'Tạo voucher thành công', voucherCode });
+        // Gọi lên Ruijie Cloud để ép cục phát mở mạng
+        let authSuccess = false;
+        if (nas_mac && ssid) {
+            authSuccess = await authorizeClient(voucherCode, nas_mac, mac, ssid, nas_ip || "1.1.1.1");
+        }
+
+        res.json({ 
+            success: true, 
+            message: 'Tạo voucher thành công', 
+            voucherCode,
+            authSuccess 
+        });
     } catch (err) {
         console.error('[auth/free error]:', err.message);
         // Fallback: nếu lỗi (do chưa setup thật), trả về mock data để vẫn chạy qua được
-        res.json({ success: true, message: 'Mock data', voucherCode: 'MOCK_FREE_VOUCHER_123' });
+        res.json({ success: true, message: 'Mock data', voucherCode: 'MOCK_FREE_VOUCHER_123', authSuccess: false });
     }
 });
 
