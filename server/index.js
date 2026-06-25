@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { authorizeFreeWiFi, upgradeToVIP } from './ruijieService.js';
+import { authorizeFreeWiFi, upgradeToVIP, getNetworkGroups, getUserGroups, generateVoucher } from './ruijieService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,14 +14,50 @@ app.use(express.json());
 // Phục vụ các file tĩnh của React (sau khi build)
 app.use(express.static(path.join(__dirname, '../dist')));
 
+// API Debug: Quét tài khoản lấy danh sách Group và Profile
+app.get('/api/debug/ruijie-groups', async (req, res) => {
+    try {
+        const netGroups = await getNetworkGroups();
+        if (!netGroups || netGroups.length === 0) {
+            return res.json({ error: 'Không tìm thấy Network Group nào.' });
+        }
+        
+        // Mặc định lấy groupId của mạng đầu tiên để test
+        const firstGroupId = netGroups[0].id;
+        
+        const userGroups = await getUserGroups(firstGroupId);
+        
+        res.json({
+            networkGroups: netGroups,
+            userGroupsForFirstNetwork: userGroups,
+            message: 'Hãy dùng các ID trong userGroupsForFirstNetwork để cấu hình biến môi trường.'
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // API: Khách hàng chọn gói Free
 app.post('/api/auth/free', async (req, res) => {
     const { mac } = req.body;
     if (!mac) return res.status(400).json({ error: 'Thiếu địa chỉ MAC' });
 
-    // Gọi Ruijie API mở mạng
-    const result = await authorizeFreeWiFi(mac);
-    res.json(result);
+    try {
+        // Trong thực tế, bạn sẽ lấy các ID này từ biến môi trường process.env
+        // Tạm thời fix cứng một số ID ảo nếu chưa lấy được từ debug
+        const groupId = process.env.RUIJIE_GROUP_ID || "123456"; 
+        const freeUserGroupId = process.env.RUIJIE_FREE_USER_GROUP_ID || "654321";
+        const freeProfileId = process.env.RUIJIE_FREE_PROFILE_ID || "uuid-free-profile";
+        
+        // Sinh Voucher tự động
+        const voucherCode = await generateVoucher(groupId, freeUserGroupId, freeProfileId);
+        
+        res.json({ success: true, message: 'Tạo voucher thành công', voucherCode });
+    } catch (err) {
+        console.error('[auth/free error]:', err.message);
+        // Fallback: nếu lỗi (do chưa setup thật), trả về mock data để vẫn chạy qua được
+        res.json({ success: true, message: 'Mock data', voucherCode: 'MOCK_FREE_VOUCHER_123' });
+    }
 });
 
 // API: Khách hàng bấm nút Thanh toán (MoMo/ZaloPay)

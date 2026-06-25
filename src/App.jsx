@@ -43,13 +43,14 @@ function App() {
             form.appendChild(input);
           }
 
-          // Thêm các tham số xác thực có thể Ruijie đang mong đợi
+          // Thêm các tham số xác thực Voucher mà Ruijie đang mong đợi
           const extraParams = {
-            auth_type: 'pass',
-            authType: 'pass',
-            user: 'guest',
-            username: 'guest',
-            password: 'guest'
+            auth_type: 'voucher',
+            authType: 'voucher',
+            user: data.voucherCode || 'guest',
+            username: data.voucherCode || 'guest',
+            password: data.voucherCode || 'guest',
+            account: data.voucherCode || 'guest'
           };
 
           for (const [key, value] of Object.entries(extraParams)) {
