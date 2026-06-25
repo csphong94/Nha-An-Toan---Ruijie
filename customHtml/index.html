@@ -16,44 +16,50 @@
     <p id="statusMsg">Đang chuẩn bị hệ thống mạng an toàn...</p>
     <script type="text/javascript" src="./js/jquery/jquery.min.js"></script>
     <script type="text/javascript">
+      function getParam(name) {
+        var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+        return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+      }
+
       window.onload = function() {
-        var urlParams = new URLSearchParams(window.location.search);
-        var voucherCode = urlParams.get('voucher');
-        var sessionId = urlParams.get('sessionId');
-        
-        if (voucherCode && sessionId) {
-          // Khách hàng vừa lấy Voucher từ Render xong và được ném về đây
-          document.getElementById('statusMsg').innerText = "Đang cấp phát băng thông 5Mbps...";
-          var paramObj = {
-            lang: 'vi',
-            authType: 'voucher',
-            sessionId: sessionId,
-            account: voucherCode
-          };
-          $.post({
-            url: "/api/auth/general",
-            data: JSON.stringify(paramObj),
-            contentType: "application/json;charset=utf-8",
-            success: function(res) {
-              if (res.success && res.result && res.result.logonUrl) {
-                document.getElementById('statusMsg').innerText = "Thành công! Đang vào mạng...";
-                window.location.replace(res.result.logonUrl);
-              } else {
-                document.getElementById('statusMsg').innerText = "Lỗi cấp mạng: " + (res.message || "Không xác định");
+        try {
+          var voucherCode = getParam('voucher');
+          var sessionId = getParam('sessionId');
+          
+          if (voucherCode && sessionId) {
+            document.getElementById('statusMsg').innerText = "Đang cấp phát băng thông 5Mbps...";
+            var paramObj = {
+              lang: 'vi',
+              authType: 'voucher',
+              sessionId: sessionId,
+              account: voucherCode
+            };
+            $.ajax({
+              type: "POST",
+              url: "/api/auth/general",
+              data: JSON.stringify(paramObj),
+              contentType: "application/json",
+              success: function(res) {
+                if (res && res.success && res.result && res.result.logonUrl) {
+                  document.getElementById('statusMsg').innerText = "Thành công! Đang vào mạng...";
+                  window.location.replace(res.result.logonUrl);
+                } else {
+                  document.getElementById('statusMsg').innerText = "Lỗi cấp mạng: " + (res ? res.message : "Không xác định");
+                }
+              },
+              error: function(xhr, status, error) {
+                document.getElementById('statusMsg').innerText = "Lỗi kết nối đến Ruijie: " + error;
               }
-            },
-            error: function() {
-              document.getElementById('statusMsg').innerText = "Lỗi kết nối đến máy chủ Ruijie!";
-            }
-          });
-        } else {
-          // Khách hàng mới vào, ném sang Render để bấm "Dùng Miễn Phí"
-          // Lấy URL hiện tại (xóa tham số rác nếu có) làm return_url để Render biết đường ném về
-          var currentHref = window.location.href.split('#')[0];
-          var returnUrl = encodeURIComponent(currentHref);
-          var searchParams = window.location.search;
-          var separator = searchParams ? "&" : "?";
-          window.location.replace("https://nha-an-toan-ruijie.onrender.com/" + searchParams + separator + "return_url=" + returnUrl);
+            });
+          } else {
+            var currentHref = window.location.href.split('#')[0];
+            var returnUrl = encodeURIComponent(currentHref);
+            var searchParams = window.location.search;
+            var separator = searchParams ? "&" : "?";
+            window.location.replace("https://nha-an-toan-ruijie.onrender.com/" + searchParams + separator + "return_url=" + returnUrl);
+          }
+        } catch (e) {
+          document.getElementById('statusMsg').innerText = "Lỗi Javascript: " + e.message;
         }
       };
     </script>

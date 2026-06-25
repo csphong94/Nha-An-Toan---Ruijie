@@ -56,25 +56,8 @@ app.post('/api/auth/free', async (req, res) => {
     if (!mac) return res.status(400).json({ error: 'Missing MAC' });
     
     try {
-        let groupId = "9105026"; // Mặc định là NAT Vali 03
-        try {
-            const rawGroups = await getNetworkGroups();
-            // Hàm đệ quy tìm GroupID hợp lệ đầu tiên (bỏ qua ROOT/0)
-            const findGroupId = (node) => {
-                if (node.type === 'BUILDING' || (node.groupId && node.groupId !== 0 && node.type !== 'ROOT')) return node.groupId;
-                if (node.subGroups) {
-                    for (const sub of node.subGroups) {
-                        const id = findGroupId(sub);
-                        if (id) return id;
-                    }
-                }
-                return null;
-            };
-            const foundId = findGroupId(rawGroups);
-            if (foundId) groupId = foundId;
-        } catch (e) {
-            console.error("Warning: Cannot fetch network groups, using default.", e.message);
-        }
+        // Cố định sử dụng Group ID của "NAT Vali 03" vì gói Free (604465) được tạo trong nhóm này
+        const groupId = "9105026"; 
         
         // ID thực tế từ tài khoản Ruijie của người dùng:
         const freeUserGroupId = process.env.RUIJIE_FREE_USER_GROUP_ID || "604465";
