@@ -14,7 +14,6 @@
   </head>
   <body style="background-color: #111827; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif;">
     <p id="statusMsg">Đang chuẩn bị hệ thống mạng an toàn...</p>
-    <script type="text/javascript" src="./js/jquery/jquery.min.js"></script>
     <script type="text/javascript">
       function getParam(name) {
         var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
@@ -34,23 +33,29 @@
               sessionId: sessionId,
               account: voucherCode
             };
-            $.ajax({
-              type: "POST",
-              url: "/api/auth/general",
-              data: JSON.stringify(paramObj),
-              contentType: "application/json",
-              success: function(res) {
-                if (res && res.success && res.result && res.result.logonUrl) {
-                  document.getElementById('statusMsg').innerText = "Thành công! Đang vào mạng...";
-                  window.location.replace(res.result.logonUrl);
+            
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/api/auth/general", true);
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.onreadystatechange = function () {
+              if (xhr.readyState === 4) {
+                if (xhr.status === 200) {
+                  var res = JSON.parse(xhr.responseText);
+                  if (res && res.success && res.result && res.result.logonUrl) {
+                    document.getElementById('statusMsg').innerText = "Thành công! Đang vào mạng...";
+                    window.location.replace(res.result.logonUrl);
+                  } else {
+                    document.getElementById('statusMsg').innerText = "Lỗi cấp mạng: " + (res ? res.message : "Không xác định");
+                  }
                 } else {
-                  document.getElementById('statusMsg').innerText = "Lỗi cấp mạng: " + (res ? res.message : "Không xác định");
+                  document.getElementById('statusMsg').innerText = "Lỗi kết nối đến Ruijie: " + xhr.status;
                 }
-              },
-              error: function(xhr, status, error) {
-                document.getElementById('statusMsg').innerText = "Lỗi kết nối đến Ruijie: " + error;
               }
-            });
+            };
+            xhr.onerror = function() {
+               document.getElementById('statusMsg').innerText = "Lỗi mạng khi gọi Ruijie API";
+            };
+            xhr.send(JSON.stringify(paramObj));
           } else {
             var currentHref = window.location.href.split('#')[0];
             var returnUrl = encodeURIComponent(currentHref);

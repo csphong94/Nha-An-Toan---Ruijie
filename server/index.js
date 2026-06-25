@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
+import axios from 'axios';
 import { authorizeFreeWiFi, upgradeToVIP, getNetworkGroups, getUserGroups, generateVoucher, submitVoucherToPortal } from './ruijieService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -74,33 +76,140 @@ app.post('/api/auth/free', async (req, res) => {
     }
 });
 
-// API: Khách hàng bấm nút Thanh toán (MoMo/ZaloPay)
-app.post('/api/payment/create', (req, res) => {
-    const { mac, packageType } = req.body;
-    console.log(`[MoMo API Mock] Đang tạo mã QR thanh toán cho MAC ${mac}, Gói ${packageType}`);
+
+// Cấu hình MoMo Sandbox
+const MOMO_CONFIG = {
+    partnerCode: process.env.MOMO_PARTNER_CODE || 'MOMO',
+    accessKey: process.env.MOMO_ACCESS_KEY || 'M8brj9K6E22vXoDB',
+    secretKey: process.env.MOMO_SECRET_KEY || 'nqQiVSgDMy809JoPF6OzP5OdBUB550Y4',
+    endpoint: 'https://test-payment.momo.vn/v2/gateway/api/create',
+    returnUrl: process.env.RENDER_EXTERNAL_URL ? `${process.env.RENDER_EXTERNAL_URL}/api/payment/momo/return` : 'http://localhost:3000/api/payment/momo/return',
+    ipnUrl: process.env.RENDER_EXTERNAL_URL ? `${process.env.RENDER_EXTERNAL_URL}/api/payment/momo/ipn` : 'http://localhost:3000/api/payment/momo/ipn'
+};
+
+const VIP_USER_GROUP_ID = "604466";
+const VIP_PROFILE_ID = "34617871223073818252355027497339";
+
+// Bộ nhớ đệm lưu orderId để sinh Voucher 1 lần
+const orderStorage = new Map();
+
+// API: Tạo thanh toán MoMo
+app.post('/api/payment/momo', async (req, res) => {
+    const { mac, sessionId, return_url, nas_mac, ssid } = req.body;
+    const amount = '10000';
+    const orderInfo = 'Nâng cấp VIP WiFi';
+    const orderId = MOMO_CONFIG.partnerCode + new Date().getTime();
+    const requestId = orderId;
+    const requestType = 'captureWallet';
     
-    // Giả lập trả về Link thanh toán
-    res.json({
-        success: true,
-        paymentUrl: `https://momo.vn/pay?amount=10000&mac=${mac}`,
-        message: 'Tạo giao dịch thành công. Vui lòng quét mã MoMo.'
-    });
+    // Gói dữ liệu hệ thống vào extraData (Base64)
+    const extraDataObj = { mac, sessionId, return_url, nas_mac, ssid };
+    const extraData = Buffer.from(JSON.stringify(extraDataObj)).toString('base64');
+    
+    // Lưu tạm vào RAM
+    orderStorage.set(orderId, { status: 'pending', extraDataObj });
+
+    // Cờ kích hoạt chế độ giả lập (Mock) nếu chưa có API Key thật
+    const USE_MOCK = process.env.USE_MOMO_MOCK !== 'false'; 
+
+    if (USE_MOCK) {
+        // Giả lập trả về trang thanh toán ảo
+        return res.json({
+            success: true,
+            payUrl: `/mock/momo/pay?orderId=${orderId}&amount=${amount}`
+        });
+    }
+
+    // Luồng gọi MoMo thật
+    const rawSignature = `accessKey=${MOMO_CONFIG.accessKey}&amount=${amount}&extraData=${extraData}&ipnUrl=${MOMO_CONFIG.ipnUrl}&orderId=${orderId}&orderInfo=${orderInfo}&partnerCode=${MOMO_CONFIG.partnerCode}&redirectUrl=${MOMO_CONFIG.returnUrl}&requestId=${requestId}&requestType=${requestType}`;
+    const signature = crypto.createHmac('sha256', MOMO_CONFIG.secretKey).update(rawSignature).digest('hex');
+
+    const requestBody = {
+        partnerCode: MOMO_CONFIG.partnerCode,
+        partnerName: "Vali WiFi",
+        storeId: "ValiWiFi",
+        requestId, amount, orderId, orderInfo,
+        redirectUrl: MOMO_CONFIG.returnUrl,
+        ipnUrl: MOMO_CONFIG.ipnUrl,
+        lang: "vi", requestType, autoCapture: true, extraData, signature
+    };
+
+    try {
+        const response = await axios.post(MOMO_CONFIG.endpoint, requestBody);
+        if (response.data && response.data.payUrl) {
+            res.json({ success: true, payUrl: response.data.payUrl });
+        } else {
+            res.status(400).json({ error: 'Lỗi tạo thanh toán MoMo', details: response.data });
+        }
+    } catch (e) {
+        res.status(500).json({ error: 'Lỗi kết nối MoMo' });
+    }
 });
 
-// API: MoMo gọi Webhook trả kết quả sau khi khách quét mã xong
-app.post('/api/payment/webhook', async (req, res) => {
-    const { mac, status } = req.body; 
-    // Thực tế: Kiểm tra chữ ký (Signature) của MoMo tại đây để bảo mật
+// Trang giả lập thanh toán MoMo (Dùng khi chưa có API thật)
+app.get('/mock/momo/pay', (req, res) => {
+    const { orderId, amount } = req.query;
+    res.send(`
+        <html>
+        <head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>MoMo Mock</title></head>
+        <body style="font-family: sans-serif; text-align: center; padding-top: 50px; background: #a50064; color: white;">
+            <h2>MÔI TRƯỜNG THỬ NGHIỆM MOMO</h2>
+            <p>Đơn hàng: ${orderId}</p>
+            <p>Số tiền: ${amount} VNĐ</p>
+            <div style="margin-top: 30px;">
+                <button onclick="window.location.href='/api/payment/momo/return?orderId=${orderId}&resultCode=0'" style="padding: 15px 30px; font-size: 18px; background: #fff; color: #a50064; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                    ✅ Giả lập Thanh toán Thành công
+                </button>
+            </div>
+            <div style="margin-top: 20px;">
+                <button onclick="window.location.href='/api/payment/momo/return?orderId=${orderId}&resultCode=1006'" style="padding: 10px 20px; font-size: 16px; background: #666; color: #fff; border: none; border-radius: 8px; cursor: pointer;">
+                    ❌ Hủy thanh toán
+                </button>
+            </div>
+        </body>
+        </html>
+    `);
+});
+
+// API: Đón người dùng quay lại từ MoMo
+app.get('/api/payment/momo/return', async (req, res) => {
+    const { orderId, resultCode } = req.query;
     
-    if (status === 'success') {
-        console.log(`[MoMo Webhook] Xác nhận thanh toán thành công cho MAC: ${mac}`);
-        
-        // Tự động gọi Ruijie Cloud -> Nâng lên 100Mbps ngay lập tức
-        const result = await upgradeToVIP(mac);
-        return res.json({ success: true, message: 'Đã nâng cấp VIP' });
+    // Ghi chú: Thực tế cần tính toán lại chữ ký HMAC-SHA256 của các tham số query để so sánh với req.query.signature bảo vệ chống gian lận.
+    // Lược bỏ xác thực chữ ký trong demo.
+    
+    const orderData = orderStorage.get(orderId);
+    if (!orderData) return res.send("Lỗi: Không tìm thấy phiên thanh toán");
+
+    const { sessionId, return_url } = orderData.extraDataObj;
+
+    if (resultCode !== '0') {
+        // Hủy hoặc lỗi
+        const separator = return_url.includes('?') ? '&' : '?';
+        return res.redirect(decodeURIComponent(return_url) + separator + 'error=payment_failed');
     }
-    
-    res.status(400).json({ error: 'Thanh toán thất bại' });
+
+    try {
+        // Sinh Voucher VIP nếu chưa sinh
+        let voucherCode = orderData.voucherCode;
+        if (!voucherCode) {
+            const groupId = "9105026"; // NAT Vali 03
+            voucherCode = await generateVoucher(groupId, VIP_USER_GROUP_ID, VIP_PROFILE_ID);
+            orderStorage.set(orderId, { ...orderData, status: 'success', voucherCode });
+        }
+
+        // Chuyển hướng về Captive Portal kèm theo Voucher
+        const separator = return_url.includes('?') ? '&' : '?';
+        res.redirect(decodeURIComponent(return_url) + separator + 'voucher=' + voucherCode + '&sessionId=' + sessionId);
+    } catch (e) {
+        res.send("Lỗi khi tạo Voucher VIP: " + e.message);
+    }
+});
+
+// API: MoMo Webhook (IPN)
+app.post('/api/payment/momo/ipn', async (req, res) => {
+    // Xác minh chữ ký, lấy orderId, sinh voucher lưu vào memory (để returnUrl lấy)
+    res.status(200).json({ message: "OK" });
 });
 
 // Render ứng dụng React cho mọi route không phải API
@@ -112,5 +221,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Backend Server đang chạy tại cổng ${PORT}`);
     console.log(`- API Cấp quyền Free: POST http://localhost:${PORT}/api/auth/free`);
-    console.log(`- API Nâng cấp VIP (MoMo Webhook): POST http://localhost:${PORT}/api/payment/webhook`);
+    console.log(`- API Khởi tạo MoMo: POST http://localhost:${PORT}/api/payment/momo`);
 });

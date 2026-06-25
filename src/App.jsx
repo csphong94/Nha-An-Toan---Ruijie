@@ -51,23 +51,7 @@ function App() {
     setLoading(false);
   };
 
-  const handleVipAuth = async () => {
-    // ... logic VIP (bỏ qua cập nhật chi tiết trong demo, sẽ làm tương tự)
-    setStatus('Đang chuyển hướng sang MoMo...');
-    try {
-      const res = await fetch('/api/payment/momo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mac: realMac, amount: 10000 })
-      });
-      const data = await res.json();
-      if (data.payUrl) {
-        window.location.href = data.payUrl;
-      }
-    } catch (err) {
-      setStatus('Lỗi tạo thanh toán MoMo');
-    }
-  };
+
 
   if (status) {
     return (
@@ -82,24 +66,34 @@ function App() {
   }
 
   const handleVIPSelect = () => {
-    setCurrentView('payment');
+    // Không cần chuyển sang trang Payment trung gian nữa, gọi API luôn
+    handleVipAuth();
   };
 
-  const handlePaymentCreate = async () => {
+  const handleVipAuth = async () => {
+    setStatus('Đang chuyển hướng sang MoMo...');
     try {
-      const res = await fetch('/api/payment/create', {
+      const res = await fetch('/api/payment/momo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mac: macAddress, packageType: 'VIP' })
+        body: JSON.stringify({
+            mac: realMac,
+            sessionId: sessionId,
+            return_url: returnUrl,
+            nas_mac: nasMac,
+            ssid: ssid
+        })
       });
       const data = await res.json();
-      if (data.success) {
-        // Chuyển hướng sang trang thanh toán MoMo
-        window.location.href = data.paymentUrl;
+      if (data.payUrl) {
+        window.location.href = data.payUrl;
+      } else {
+        setStatus('Lỗi tạo thanh toán MoMo: ' + JSON.stringify(data.error));
+        setTimeout(() => setStatus(''), 3000);
       }
     } catch (err) {
-      console.error(err);
-      alert('Lỗi khởi tạo thanh toán MoMo.');
+      setStatus('Lỗi kết nối máy chủ khi tạo thanh toán MoMo');
+      setTimeout(() => setStatus(''), 3000);
     }
   };
 
