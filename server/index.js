@@ -56,11 +56,10 @@ app.post('/api/auth/free', async (req, res) => {
     if (!mac) return res.status(400).json({ error: 'Thiếu địa chỉ MAC' });
 
     try {
-        // Trong thực tế, bạn sẽ lấy các ID này từ biến môi trường process.env
-        // Tạm thời fix cứng một số ID ảo nếu chưa lấy được từ debug
-        const groupId = process.env.RUIJIE_GROUP_ID || "123456"; 
-        const freeUserGroupId = process.env.RUIJIE_FREE_USER_GROUP_ID || "654321";
-        const freeProfileId = process.env.RUIJIE_FREE_PROFILE_ID || "uuid-free-profile";
+        // ID thực tế từ tài khoản Ruijie của người dùng:
+        const groupId = process.env.RUIJIE_GROUP_ID || "9105026"; 
+        const freeUserGroupId = process.env.RUIJIE_FREE_USER_GROUP_ID || "604465";
+        const freeProfileId = process.env.RUIJIE_FREE_PROFILE_ID || "67940168875442127021979345797676";
         
         // Sinh Voucher tự động
         const voucherCode = await generateVoucher(groupId, freeUserGroupId, freeProfileId);
