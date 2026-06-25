@@ -40,9 +40,9 @@ export async function getAccessToken() {
 export async function getNetworkGroups() {
     const token = await getAccessToken();
     try {
-        const response = await axios.post(`${BASE_URL}/service/api/open/v1/group?access_token=${token}`, {});
+        const response = await axios.get(`${BASE_URL}/service/api/group/single/tree?depth=BUILDING&access_token=${token}`);
         if (response.data && response.data.code === 0) {
-            return response.data.result; // Trả về danh sách Group
+            return response.data.groups; // Trả về danh sách Group
         }
         throw new Error('Lỗi lấy Network Groups: ' + JSON.stringify(response.data));
     } catch (error) {
