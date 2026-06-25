@@ -76,8 +76,12 @@ app.post('/api/auth/free', async (req, res) => {
             console.error("Warning: Cannot fetch network groups, using default.", e.message);
         }
         
+        // ID thực tế từ tài khoản Ruijie của người dùng:
+        const freeUserGroupId = process.env.RUIJIE_FREE_USER_GROUP_ID || "604465";
+        const freeProfileId = process.env.RUIJIE_FREE_PROFILE_ID || "67940168875442127021979345797676";
+
         // Tạo Voucher 5Mbps (Voucher sẽ thuộc User Group "Free")
-        const voucherCode = await generateVoucher(groupId, "Free", 1);
+        const voucherCode = await generateVoucher(groupId, freeUserGroupId, freeProfileId);
         
         if (voucherCode && sessionId) {
             // Gửi Voucher lên Portal-as để thực sự cấp mạng
