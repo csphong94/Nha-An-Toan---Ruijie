@@ -78,10 +78,10 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             mac: realMac,
-            sessionId: sessionId,
-            return_url: returnUrl,
-            nas_mac: nasMac,
-            ssid: ssid
+            sessionId: urlParams.get('sessionId'),
+            return_url: urlParams.get('return_url'),
+            nas_mac: urlParams.get('nas_mac'),
+            ssid: urlParams.get('ssid')
         })
       });
       const data = await res.json();
