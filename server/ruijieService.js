@@ -81,9 +81,8 @@ export async function generateVoucher(groupId, userGroupId, profileId) {
         const response = await axios.post(`${BASE_URL}/service/api/open/auth/voucher/create/${groupId}?access_token=${token}`, payload);
         
         if (response.data && response.data.code === 0) {
-            // response.data.List Price[0].codeNo (hoặc data.data, tùy cấu trúc API)
-            // Tài liệu API ghi trả về mảng "List Price" (chắc do copy nhầm), thử lấy theo cấu trúc chung:
-            const voucherList = response.data['List Price'] || response.data.data || response.data.result;
+            // response.data.voucherData.list
+            const voucherList = response.data.voucherData?.list || response.data['List Price'] || response.data.data || response.data.result;
             if (voucherList && voucherList.length > 0) {
                 const voucherCode = voucherList[0].codeNo;
                 console.log(`[Ruijie API] Đã tạo thành công Voucher: ${voucherCode}`);
