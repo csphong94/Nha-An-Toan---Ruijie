@@ -56,9 +56,25 @@ app.post('/api/auth/free', async (req, res) => {
     if (!mac) return res.status(400).json({ error: 'Missing MAC' });
     
     try {
-        const groups = await getNetworkGroups();
-        if (!groups || groups.length === 0) throw new Error('Không lấy được nhóm mạng');
-        const groupId = groups[0].groupId;
+        let groupId = "9105026"; // Mặc định là NAT Vali 03
+        try {
+            const rawGroups = await getNetworkGroups();
+            // Hàm đệ quy tìm GroupID hợp lệ đầu tiên (bỏ qua ROOT/0)
+            const findGroupId = (node) => {
+                if (node.type === 'BUILDING' || (node.groupId && node.groupId !== 0 && node.type !== 'ROOT')) return node.groupId;
+                if (node.subGroups) {
+                    for (const sub of node.subGroups) {
+                        const id = findGroupId(sub);
+                        if (id) return id;
+                    }
+                }
+                return null;
+            };
+            const foundId = findGroupId(rawGroups);
+            if (foundId) groupId = foundId;
+        } catch (e) {
+            console.error("Warning: Cannot fetch network groups, using default.", e.message);
+        }
         
         // Tạo Voucher 5Mbps (Voucher sẽ thuộc User Group "Free")
         const voucherCode = await generateVoucher(groupId, "Free", 1);
