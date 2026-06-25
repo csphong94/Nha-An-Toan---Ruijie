@@ -65,22 +65,11 @@ app.post('/api/auth/free', async (req, res) => {
         // Sinh Voucher tự động
         const voucherCode = await generateVoucher(groupId, freeUserGroupId, freeProfileId);
         
-        // Gọi lên Ruijie Cloud để ép cục phát mở mạng
-        let authSuccess = false;
-        if (nas_mac && ssid) {
-            authSuccess = await authorizeClient(voucherCode, nas_mac, mac, ssid, nas_ip || "1.1.1.1");
-        }
-
-        res.json({ 
-            success: true, 
-            message: 'Tạo voucher thành công', 
-            voucherCode,
-            authSuccess 
-        });
+        res.json({ success: true, message: 'Tạo voucher thành công', voucherCode });
     } catch (err) {
         console.error('[auth/free error]:', err.message);
         // Fallback: nếu lỗi (do chưa setup thật), trả về mock data để vẫn chạy qua được
-        res.json({ success: true, message: 'Mock data', voucherCode: 'MOCK_FREE_VOUCHER_123', authSuccess: false });
+        res.json({ success: true, message: 'Mock data', voucherCode: 'MOCK_FREE_VOUCHER_123' });
     }
 });
 
