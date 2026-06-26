@@ -101,11 +101,11 @@ function App() {
 
   if (status) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white p-4">
-        <div className="bg-gray-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center border border-gray-700">
+      <div className="app-container">
+        <div className="glass-card text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
-          <h2 className="text-xl font-bold mb-2">{status}</h2>
-          <p className="text-gray-400 text-sm">Vui lòng chờ trong giây lát...</p>
+          <h2 className="title mb-2">{status}</h2>
+          <p className="subtitle text-sm">Vui lòng chờ trong giây lát...</p>
         </div>
       </div>
     );
@@ -113,8 +113,10 @@ function App() {
 
   if (!config) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white p-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+      <div className="app-container">
+        <div className="glass-card text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
+        </div>
       </div>
     );
   }
@@ -124,67 +126,65 @@ function App() {
   const vipPackages = config.packages.filter(p => p.type === 'vip');
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background Decor */}
-      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-orange-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-20"></div>
-      <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-20"></div>
-
-      <div className="bg-gray-800/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl w-full max-w-md text-center z-10 border border-gray-700">
+    <div className="app-container">
+      <div className="glass-card text-center relative z-10">
         <WifiIcon />
-        <h1 className="text-3xl font-extrabold mb-2 bg-gradient-to-r from-orange-400 to-pink-500 bg-clip-text text-transparent">
-          {config.portal.title}
-        </h1>
-        <p className="text-gray-400 mb-8 font-medium">{config.portal.subtitle}</p>
+        <h1 className="title mb-2">{config.portal.title}</h1>
+        <p className="subtitle mb-6">{config.portal.subtitle}</p>
 
         {/* Thông tin thiết bị */}
-        <div className="bg-gray-900/50 rounded-xl p-4 mb-8 text-sm text-gray-400 border border-gray-700 shadow-inner text-left">
-          <div className="flex justify-between mb-2">
-            <span>Thiết bị của bạn:</span>
+        <div className="mb-6" style={{ textAlign: 'left', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--surface-border)' }}>
+          <div className="flex justify-between mb-2" style={{ fontSize: '0.85rem' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Thiết bị của bạn:</span>
             <span className="font-mono text-gray-300">{realMac}</span>
           </div>
-          <div className="flex justify-between">
-            <span>Trạng thái:</span>
-            <span className="text-orange-400 font-semibold flex items-center">
-              <span className="w-2 h-2 rounded-full bg-orange-400 mr-2 animate-pulse"></span>
+          <div className="flex justify-between items-center" style={{ fontSize: '0.85rem' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Trạng thái:</span>
+            <span className="flex items-center" style={{ color: 'var(--accent-vip)', fontWeight: '600' }}>
+              <span className="w-2 h-2 rounded-full mr-2 animate-pulse" style={{ backgroundColor: 'var(--accent-vip)' }}></span>
               Chưa kết nối
             </span>
           </div>
         </div>
 
-        <div className="space-y-4">
+        <div className="flex-col gap-4">
           {/* Nút Gói Free */}
           {freePackages.length > 0 && (
             <button
               onClick={handleFreeAuth}
               disabled={loading}
-              className="w-full relative group overflow-hidden bg-gray-700 hover:bg-gray-600 text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 border border-gray-600 hover:border-gray-500 shadow-lg"
+              className="btn btn-free mb-6"
             >
-              <div className="flex items-center justify-center">
-                <span className="text-lg">{freePackages[0].name}</span>
+              <div className="flex-col items-center justify-center w-full">
+                <span style={{ display: 'block', fontSize: '1.1rem', marginBottom: '4px' }}>{freePackages[0].name}</span>
+                <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 'normal' }}>Quảng cáo / Giới hạn tốc độ</span>
               </div>
-              <p className="text-xs text-gray-400 mt-1 font-normal">Quảng cáo / Giới hạn tốc độ</p>
             </button>
           )}
 
           {/* Các Gói VIP */}
           {vipPackages.length > 0 && (
-            <div className="mt-8">
-              <h3 className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-wider">Nâng cấp VIP (Không giới hạn)</h3>
-              <div className="grid grid-cols-1 gap-3">
+            <div>
+              <h3 className="mb-4" style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Nâng cấp VIP (Không giới hạn)
+              </h3>
+              
+              <div className="flex-col gap-3">
                 {vipPackages.map(pkg => (
                   <button
                     key={pkg.id}
                     onClick={() => handleVipAuth(pkg.id)}
-                    className="w-full flex items-center justify-between bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-600 hover:to-pink-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transform transition hover:scale-105"
+                    className="btn btn-vip w-full flex justify-between items-center"
+                    style={{ marginBottom: '0.75rem' }}
                   >
                     <div className="flex items-center">
                       <RocketIcon />
-                      <div className="text-left">
-                        <div className="text-md">{pkg.name}</div>
-                        <div className="text-xs text-orange-200">{pkg.durationDays} Ngày sử dụng</div>
+                      <div style={{ textAlign: 'left' }}>
+                        <div style={{ fontSize: '1rem' }}>{pkg.name}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)', fontWeight: 'normal' }}>{pkg.durationDays} Ngày sử dụng</div>
                       </div>
                     </div>
-                    <div className="text-lg bg-black/20 px-3 py-1 rounded-lg">
+                    <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.25rem 0.75rem', borderRadius: '8px', fontSize: '0.9rem' }}>
                       {pkg.price.toLocaleString('vi-VN')}đ
                     </div>
                   </button>
