@@ -1,9 +1,7 @@
 import axios from 'axios';
+import { getDb } from './db.js';
 
-const APP_ID = 'openb79f8985c8dd';
-const APP_SECRET = '65a7761ef24f4cde84302d348850ba25';
 const BASE_URL = 'https://cloud-as.ruijienetworks.com';
-const TOKEN_STATIC = 'd63dss0a81e4415a889ac5b78fsc904a';
 
 let accessToken = null;
 let tokenExpiresAt = 0;
@@ -16,6 +14,11 @@ export async function getAccessToken() {
     }
 
     try {
+        const db = getDb();
+        const APP_ID = db.ruijie.appId || 'openb79f8985c8dd';
+        const APP_SECRET = db.ruijie.appSecret || '65a7761ef24f4cde84302d348850ba25';
+        const TOKEN_STATIC = db.ruijie.tokenStatic || 'd63dss0a81e4415a889ac5b78fsc904a';
+
         console.log('[Ruijie API] Đang kết nối để lấy Token...');
         const response = await axios.post(`${BASE_URL}/service/api/oauth20/client/access_token?token=${TOKEN_STATIC}`, {
             appid: APP_ID,

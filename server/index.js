@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import axios from 'axios';
 import { authorizeFreeWiFi, upgradeToVIP, getNetworkGroups, getUserGroups, generateVoucher, submitVoucherToPortal } from './ruijieService.js';
+import adminRouter from './routes/admin.js';
+import { getDb } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,8 +15,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// API Admin
+app.use('/api/admin', adminRouter);
+
 // Phục vụ các file tĩnh của React (sau khi build)
 app.use(express.static(path.join(__dirname, '../dist')));
+
+// Fallback route cho React Router
+app.get(/^(?!\/api).+/, (req, res) => {
+  res.sendFile(path.join(__dirname, '../dist/index.html'));
+});
 
 // API Debug: Quét tài khoản lấy danh sách Group và Profile
 app.get('/api/debug/ruijie-groups', async (req, res) => {
@@ -58,15 +68,17 @@ app.post('/api/auth/free', async (req, res) => {
     if (!mac) return res.status(400).json({ error: 'Missing MAC' });
     
     try {
-        // Cố định sử dụng Group ID của "NAT Vali 03" vì gói Free (604465) được tạo trong nhóm này
-        const groupId = "9105026"; 
+        const db = getDb();
+        const groupId = db.ruijie.groupId || "9105026"; 
         
-        // ID thực tế từ tài khoản Ruijie của người dùng:
-        const freeUserGroupId = process.env.RUIJIE_FREE_USER_GROUP_ID || "604465";
-        const freeProfileId = process.env.RUIJIE_FREE_PROFILE_ID || "67940168875442127021979345797676";
+        // Tìm gói Free trong DB
+        const freePkg = db.packages.find(p => p.type === 'free');
+        if (!freePkg) {
+            return res.status(500).json({ error: 'Chưa cấu hình gói Free trong Admin' });
+        }
 
-        // Tạo Voucher 5Mbps (Voucher sẽ thuộc User Group "Free")
-        const voucherCode = await generateVoucher(groupId, freeUserGroupId, freeProfileId);
+        // Tạo Voucher
+        const voucherCode = await generateVoucher(groupId, freePkg.ruijieUserGroupId, freePkg.ruijieProfileId);
         
         // Trả về Voucher Code để Frontend redirect quay lại customHtml
         res.json({ success: true, authSuccess: true, voucherCode: voucherCode });
@@ -95,15 +107,22 @@ const orderStorage = new Map();
 
 // API: Tạo thanh toán MoMo
 app.post('/api/payment/momo', async (req, res) => {
-    const { mac, sessionId, return_url, nas_mac, ssid } = req.body;
-    const amount = '10000';
-    const orderInfo = 'Nâng cấp VIP WiFi';
+    const { mac, sessionId, return_url, nas_mac, ssid, packageId } = req.body;
+    
+    const db = getDb();
+    const pkg = db.packages.find(p => p.id === packageId);
+    if (!pkg) {
+        return res.status(400).json({ error: 'Gói cước không hợp lệ' });
+    }
+
+    const amount = String(pkg.price);
+    const orderInfo = `Mua gói ${pkg.name}`;
     const orderId = MOMO_CONFIG.partnerCode + new Date().getTime();
     const requestId = orderId;
     const requestType = 'captureWallet';
     
     // Gói dữ liệu hệ thống vào extraData (Base64)
-    const extraDataObj = { mac, sessionId, return_url, nas_mac, ssid };
+    const extraDataObj = { mac, sessionId, return_url, nas_mac, ssid, packageId };
     const extraData = Buffer.from(JSON.stringify(extraDataObj)).toString('base64');
     
     // Lưu tạm vào RAM
@@ -181,7 +200,7 @@ app.get('/api/payment/momo/return', async (req, res) => {
     const orderData = orderStorage.get(orderId);
     if (!orderData) return res.send("Lỗi: Không tìm thấy phiên thanh toán");
 
-    const { sessionId, return_url } = orderData.extraDataObj;
+    const { sessionId, return_url, packageId } = orderData.extraDataObj;
 
     if (resultCode !== '0') {
         // Hủy hoặc lỗi
@@ -190,11 +209,18 @@ app.get('/api/payment/momo/return', async (req, res) => {
     }
 
     try {
+        const db = getDb();
+        const groupId = db.ruijie.groupId || "9105026"; 
+        const pkg = db.packages.find(p => p.id === packageId);
+        
+        if (!pkg) {
+            return res.send("Lỗi: Không tìm thấy gói cước đã mua trong hệ thống.");
+        }
+
         // Sinh Voucher VIP nếu chưa sinh
         let voucherCode = orderData.voucherCode;
         if (!voucherCode) {
-            const groupId = "9105026"; // NAT Vali 03
-            voucherCode = await generateVoucher(groupId, VIP_USER_GROUP_ID, VIP_PROFILE_ID);
+            voucherCode = await generateVoucher(groupId, pkg.ruijieUserGroupId, pkg.ruijieProfileId);
             orderStorage.set(orderId, { ...orderData, status: 'success', voucherCode });
         }
 

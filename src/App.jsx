@@ -1,15 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './index.css';
 
 function App() {
-  const [currentView, setCurrentView] = useState('login'); // 'login', 'payment', 'status'
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState(null);
+  const [config, setConfig] = useState(null);
   
   // Lấy MAC thật từ URL do Ruijie gán vào (ví dụ: ?mac=AA:BB:CC...)
   const urlParams = new URLSearchParams(window.location.search);
   const realMac = urlParams.get('mac') || urlParams.get('client_mac') || 'UNKNOWN_MAC';
-  const [macAddress] = useState(realMac);
+
+  useEffect(() => {
+    // Tải cấu hình Public từ Backend (Tên trang, Lời chào, Danh sách Gói cước)
+    fetch('/api/admin/config/public')
+      .then(res => res.json())
+      .then(data => setConfig(data))
+      .catch(err => console.error("Lỗi tải cấu hình:", err));
+  }, []);
 
   const handleFreeAuth = async () => {
     setLoading(true);
@@ -51,7 +58,46 @@ function App() {
     setLoading(false);
   };
 
+  const handleVipAuth = async (packageId) => {
+    setStatus('Đang chuyển hướng sang MoMo...');
+    try {
+      const res = await fetch('/api/payment/momo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            mac: realMac,
+            sessionId: urlParams.get('sessionId'),
+            return_url: urlParams.get('return_url'),
+            nas_mac: urlParams.get('nas_mac'),
+            ssid: urlParams.get('ssid'),
+            packageId: packageId // Truyền ID gói cước vừa chọn
+        })
+      });
+      const data = await res.json();
+      if (data.payUrl) {
+        window.location.href = data.payUrl;
+      } else {
+        setStatus('Lỗi tạo thanh toán MoMo: ' + JSON.stringify(data.error));
+        setTimeout(() => setStatus(null), 3000);
+      }
+    } catch (err) {
+      setStatus('Lỗi kết nối máy chủ khi tạo thanh toán MoMo');
+      setTimeout(() => setStatus(null), 3000);
+    }
+  };
 
+  // SVG Icons
+  const WifiIcon = () => (
+    <svg className="w-16 h-16 mx-auto mb-6 text-orange-500 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"></path>
+    </svg>
+  );
+
+  const RocketIcon = () => (
+    <svg className="w-6 h-6 mr-2 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+    </svg>
+  );
 
   if (status) {
     return (
@@ -65,155 +111,89 @@ function App() {
     );
   }
 
-  const handleVIPSelect = () => {
-    // Không cần chuyển sang trang Payment trung gian nữa, gọi API luôn
-    handleVipAuth();
-  };
-
-  const handleVipAuth = async () => {
-    setStatus('Đang chuyển hướng sang MoMo...');
-    try {
-      const res = await fetch('/api/payment/momo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            mac: realMac,
-            sessionId: urlParams.get('sessionId'),
-            return_url: urlParams.get('return_url'),
-            nas_mac: urlParams.get('nas_mac'),
-            ssid: urlParams.get('ssid')
-        })
-      });
-      const data = await res.json();
-      if (data.payUrl) {
-        window.location.href = data.payUrl;
-      } else {
-        setStatus('Lỗi tạo thanh toán MoMo: ' + JSON.stringify(data.error));
-        setTimeout(() => setStatus(''), 3000);
-      }
-    } catch (err) {
-      setStatus('Lỗi kết nối máy chủ khi tạo thanh toán MoMo');
-      setTimeout(() => setStatus(''), 3000);
-    }
-  };
-
-  // SVG Icons
-  const WifiIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#EAB308', marginBottom: '1rem' }}>
-      <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
-      <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
-      <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
-      <line x1="12" y1="20" x2="12.01" y2="20"></line>
-    </svg>
-  );
-
-  const CheckIcon = () => (
-    <svg className="feature-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="20 6 9 17 4 12"></polyline>
-    </svg>
-  );
-
-  const renderLogin = () => (
-    <div className="glass-card text-center">
-      <WifiIcon />
-      <h1 className="title mb-2">Nha An Toan - Wifi</h1>
-      <p className="subtitle mb-6">Chào mừng! Vui lòng chọn gói truy cập mạng của bạn.</p>
-
-      {/* Behavioral Nudge: Put VIP first and make it shiny */}
-      <div className="mb-4">
-        <button className="btn btn-vip flex items-center justify-center gap-3" onClick={() => handleVIPSelect()}>
-          Nâng cấp VIP - Tốc độ 100Mbps
-          <span className="badge badge-free" style={{ background: 'rgba(255,255,255,0.2)', color: 'white' }}>Mượt mà</span>
-        </button>
-        <ul className="feature-list mb-4 mt-4" style={{ padding: '0 1rem' }}>
-          <li className="feature-item"><CheckIcon /> Lướt web, xem phim 4K không lag</li>
-          <li className="feature-item"><CheckIcon /> Chơi game ping thấp</li>
-          <li className="feature-item"><CheckIcon /> Không bị ngắt kết nối</li>
-        </ul>
+  if (!config) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white p-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto mb-4"></div>
       </div>
+    );
+  }
 
-      <div style={{ height: '1px', background: 'var(--surface-border)', margin: '1.5rem 0' }}></div>
-
-      {/* Behavioral Nudge: Free is secondary and muted */}
-      <div>
-        <button className="btn btn-free" onClick={() => handleFreeAuth()} disabled={loading}>
-          {loading ? 'Đang kết nối...' : 'Dùng Miễn Phí (5Mbps)'}
-        </button>
-        <p className="text-gray-400 text-sm mt-4 text-center">
-          Tốc độ cơ bản, có thể chậm khi tải video.
-        </p>
-      </div>
-
-      {/* Debug Info for Developer */}
-      <div className="mt-8 p-4 bg-gray-800 rounded-lg text-xs text-gray-400 break-all border border-gray-700">
-        <p className="font-bold text-gray-300 mb-1">🛠 Debug Info (Gửi ảnh này cho Dev):</p>
-        <p>{window.location.search}</p>
-      </div>
-    </div>
-  );
-
-  const renderPayment = () => (
-    <div className="glass-card text-center">
-      <h2 className="title mb-4">Chọn gói VIP</h2>
-      
-      <div className="mb-4" style={{ textAlign: 'left', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--accent-vip)' }}>
-        <div className="flex justify-between items-center mb-2">
-          <strong style={{ color: 'var(--accent-vip)' }}>Gói 2 Giờ</strong>
-          <span className="badge badge-vip">10,000đ</span>
-        </div>
-        <p className="subtitle" style={{ fontSize: '0.8rem' }}>Tối ưu cho một buổi cafe làm việc.</p>
-      </div>
-
-      <div className="mb-6" style={{ textAlign: 'left', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--surface-border)' }}>
-        <div className="flex justify-between items-center mb-2">
-          <strong>Gói Cả Ngày</strong>
-          <span className="badge badge-free">25,000đ</span>
-        </div>
-        <p className="subtitle" style={{ fontSize: '0.8rem' }}>Thoải mái sử dụng không lo hết hạn.</p>
-      </div>
-
-      <button className="btn btn-vip mb-4" onClick={() => handlePaymentCreate()}>
-        Thanh toán qua MoMo
-      </button>
-
-      <button className="btn btn-free" style={{ border: 'none' }} onClick={() => setCurrentView('login')}>
-        Quay lại
-      </button>
-    </div>
-  );
-
-  const renderStatus = () => (
-    <div className="glass-card text-center">
-      <div style={{ background: 'rgba(16, 185, 129, 0.1)', color: 'var(--success)', display: 'inline-block', padding: '1rem', borderRadius: '50%', marginBottom: '1rem' }}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-          <polyline points="22 4 12 14.01 9 11.01"></polyline>
-        </svg>
-      </div>
-      
-      <h2 className="title mb-2">Đã kết nối!</h2>
-      <p className="subtitle mb-6">Bạn đang sử dụng gói Miễn Phí (5Mbps).</p>
-
-      {/* Behavioral Nudge: Upsell after free connection */}
-      <div style={{ background: 'rgba(234, 179, 8, 0.05)', border: '1px dashed rgba(234, 179, 8, 0.3)', padding: '1.5rem', borderRadius: '16px', marginBottom: '1.5rem' }}>
-        <h3 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem', fontSize: '1.1rem' }}>Cảm thấy mạng chậm?</h3>
-        <p className="subtitle mb-4" style={{ fontSize: '0.85rem' }}>Nâng cấp băng thông ngay lập tức để trải nghiệm mượt mà hơn mà không cần đăng nhập lại.</p>
-        <button className="btn btn-vip" onClick={() => setCurrentView('payment')} style={{ padding: '0.75rem', fontSize: '0.95rem' }}>
-          Nâng cấp VIP ngay
-        </button>
-      </div>
-
-      <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-        Mẹo: Bạn có thể giữ lại trang này để nâng cấp bất cứ lúc nào.
-      </p>
-    </div>
-  );
+  // Tách gói Free và VIP
+  const freePackages = config.packages.filter(p => p.type === 'free');
+  const vipPackages = config.packages.filter(p => p.type === 'vip');
 
   return (
-    <div className="app-container">
-      {currentView === 'login' && renderLogin()}
-      {currentView === 'payment' && renderPayment()}
-      {currentView === 'status' && renderStatus()}
+    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background Decor */}
+      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-orange-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-20"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-20"></div>
+
+      <div className="bg-gray-800/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl w-full max-w-md text-center z-10 border border-gray-700">
+        <WifiIcon />
+        <h1 className="text-3xl font-extrabold mb-2 bg-gradient-to-r from-orange-400 to-pink-500 bg-clip-text text-transparent">
+          {config.portal.title}
+        </h1>
+        <p className="text-gray-400 mb-8 font-medium">{config.portal.subtitle}</p>
+
+        {/* Thông tin thiết bị */}
+        <div className="bg-gray-900/50 rounded-xl p-4 mb-8 text-sm text-gray-400 border border-gray-700 shadow-inner text-left">
+          <div className="flex justify-between mb-2">
+            <span>Thiết bị của bạn:</span>
+            <span className="font-mono text-gray-300">{realMac}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Trạng thái:</span>
+            <span className="text-orange-400 font-semibold flex items-center">
+              <span className="w-2 h-2 rounded-full bg-orange-400 mr-2 animate-pulse"></span>
+              Chưa kết nối
+            </span>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {/* Nút Gói Free */}
+          {freePackages.length > 0 && (
+            <button
+              onClick={handleFreeAuth}
+              disabled={loading}
+              className="w-full relative group overflow-hidden bg-gray-700 hover:bg-gray-600 text-white font-bold py-4 px-6 rounded-2xl transition-all duration-300 border border-gray-600 hover:border-gray-500 shadow-lg"
+            >
+              <div className="flex items-center justify-center">
+                <span className="text-lg">{freePackages[0].name}</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1 font-normal">Quảng cáo / Giới hạn tốc độ</p>
+            </button>
+          )}
+
+          {/* Các Gói VIP */}
+          {vipPackages.length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-sm font-bold text-gray-400 mb-4 uppercase tracking-wider">Nâng cấp VIP (Không giới hạn)</h3>
+              <div className="grid grid-cols-1 gap-3">
+                {vipPackages.map(pkg => (
+                  <button
+                    key={pkg.id}
+                    onClick={() => handleVipAuth(pkg.id)}
+                    className="w-full flex items-center justify-between bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-600 hover:to-pink-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transform transition hover:scale-105"
+                  >
+                    <div className="flex items-center">
+                      <RocketIcon />
+                      <div className="text-left">
+                        <div className="text-md">{pkg.name}</div>
+                        <div className="text-xs text-orange-200">{pkg.durationDays} Ngày sử dụng</div>
+                      </div>
+                    </div>
+                    <div className="text-lg bg-black/20 px-3 py-1 rounded-lg">
+                      {pkg.price.toLocaleString('vi-VN')}đ
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
