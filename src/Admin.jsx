@@ -226,6 +226,7 @@ export default function Admin() {
                               <tr className="border-b border-gray-700">
                                  <th className="p-4 text-gray-400 font-medium">Khách hàng</th>
                                  <th className="p-4 text-gray-400 font-medium">SĐT</th>
+                                 <th className="p-4 text-gray-400 font-medium">MAC Thiết bị</th>
                                  <th className="p-4 text-gray-400 font-medium">Gói Mạng</th>
                                  <th className="p-4 text-gray-400 font-medium">Mã Voucher</th>
                                  <th className="p-4 text-gray-400 font-medium">Thời gian</th>
@@ -235,13 +236,14 @@ export default function Admin() {
                            <tbody>
                               {vouchers.length === 0 ? (
                                  <tr>
-                                    <td colSpan="6" className="text-center p-8 text-gray-500">Chưa có khách hàng nào</td>
+                                    <td colSpan="7" className="text-center p-8 text-gray-500">Chưa có khách hàng nào</td>
                                  </tr>
                               ) : (
                                  [...vouchers].reverse().map(v => (
                                     <tr key={v.id} className="border-b border-gray-700/50 hover:bg-gray-700/30 transition-colors">
                                        <td className="p-4 font-bold text-white">{v.customerName}</td>
                                        <td className="p-4 text-gray-300">{v.customerPhone}</td>
+                                       <td className="p-4 font-mono text-gray-400 text-sm">{v.mac}</td>
                                        <td className="p-4">
                                           <span className="bg-orange-500/20 text-orange-400 px-3 py-1 rounded-full text-sm">{v.packageName}</span>
                                        </td>
