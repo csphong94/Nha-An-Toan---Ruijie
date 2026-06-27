@@ -88,6 +88,33 @@ app.post('/api/auth/free', async (req, res) => {
     }
 });
 
+// API: Kích hoạt thủ công bằng mật khẩu Admin (Tiền mặt)
+app.post('/api/auth/admin-bypass', async (req, res) => {
+    const { password, packageId, mac, nas_mac, ssid, sessionId } = req.body;
+    if (!password || !packageId) return res.status(400).json({ error: 'Thiếu thông tin yêu cầu' });
+    
+    try {
+        const db = getDb();
+        if (password !== db.adminPassword) {
+            return res.status(401).json({ error: 'Mật khẩu Admin không đúng' });
+        }
+
+        const groupId = db.ruijie.groupId || "9105026"; 
+        const pkg = db.packages.find(p => p.id === packageId);
+        if (!pkg) {
+            return res.status(400).json({ error: 'Không tìm thấy gói cước' });
+        }
+
+        // Sinh Voucher
+        const voucherCode = await generateVoucher(groupId, pkg.ruijieUserGroupId, pkg.ruijieProfileId);
+        
+        res.json({ success: true, authSuccess: true, voucherCode: voucherCode });
+    } catch (error) {
+        console.error("Lỗi cấp voucher admin-bypass:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 
 // Cấu hình MoMo Sandbox
 const MOMO_CONFIG = {
@@ -194,18 +221,14 @@ app.get('/mock/momo/pay', (req, res) => {
 app.get('/api/payment/momo/return', async (req, res) => {
     const { orderId, resultCode } = req.query;
     
-    // Ghi chú: Thực tế cần tính toán lại chữ ký HMAC-SHA256 của các tham số query để so sánh với req.query.signature bảo vệ chống gian lận.
-    // Lược bỏ xác thực chữ ký trong demo.
-    
     const orderData = orderStorage.get(orderId);
     if (!orderData) return res.send("Lỗi: Không tìm thấy phiên thanh toán");
 
     const { sessionId, return_url, packageId } = orderData.extraDataObj;
 
     if (resultCode !== '0') {
-        // Hủy hoặc lỗi
-        const separator = return_url.includes('?') ? '&' : '?';
-        return res.redirect(decodeURIComponent(return_url) + separator + 'error=payment_failed');
+        // Hủy hoặc lỗi, redirect về trang chủ kèm lỗi
+        return res.redirect(`/?error=payment_failed`);
     }
 
     try {
@@ -224,9 +247,9 @@ app.get('/api/payment/momo/return', async (req, res) => {
             orderStorage.set(orderId, { ...orderData, status: 'success', voucherCode });
         }
 
-        // Chuyển hướng về Captive Portal kèm theo Voucher
-        const separator = return_url.includes('?') ? '&' : '?';
-        res.redirect(decodeURIComponent(return_url) + separator + 'voucher=' + voucherCode + '&sessionId=' + sessionId);
+        // Chuyển hướng về Frontend của chúng ta (App.jsx) để hiển thị mã Voucher
+        // Frontend sẽ nhận các tham số này và hiện nút "Kết nối" để chuyển tiếp đến Ruijie
+        res.redirect(`/?success=true&voucher=${voucherCode}&return_url=${encodeURIComponent(return_url)}&sessionId=${sessionId}`);
     } catch (e) {
         res.send("Lỗi khi tạo Voucher VIP: " + e.message);
     }

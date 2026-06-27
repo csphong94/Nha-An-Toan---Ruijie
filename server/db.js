@@ -32,17 +32,44 @@ const defaultData = {
             type: "free",
             durationDays: 30,
             price: 0,
-            ruijieProfileId: "604465",
-            ruijieUserGroupId: "604465"
+            ruijieProfileId: "", // Update in Admin
+            ruijieUserGroupId: "" // Update in Admin
         },
         {
-            id: "pkg_vip",
-            name: "Gói VIP Không giới hạn",
+            id: "pkg_vip1",
+            name: "Gói VIP 1 Ngày",
+            type: "vip",
+            durationDays: 1,
+            price: 5000,
+            ruijieProfileId: "",
+            ruijieUserGroupId: ""
+        },
+        {
+            id: "pkg_vip3",
+            name: "Gói VIP 3 Ngày",
+            type: "vip",
+            durationDays: 3,
+            price: 12000,
+            ruijieProfileId: "",
+            ruijieUserGroupId: ""
+        },
+        {
+            id: "pkg_vip7",
+            name: "Gói VIP 7 Ngày",
+            type: "vip",
+            durationDays: 7,
+            price: 25000,
+            ruijieProfileId: "",
+            ruijieUserGroupId: ""
+        },
+        {
+            id: "pkg_vip30",
+            name: "Gói VIP 30 Ngày",
             type: "vip",
             durationDays: 30,
-            price: 10000,
-            ruijieProfileId: "604466",
-            ruijieUserGroupId: "604466"
+            price: 80000,
+            ruijieProfileId: "",
+            ruijieUserGroupId: ""
         }
     ]
 };
