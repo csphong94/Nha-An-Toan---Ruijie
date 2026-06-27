@@ -32,8 +32,8 @@ const defaultData = {
             type: "free",
             durationDays: 30,
             price: 0,
-            ruijieProfileId: "", // Update in Admin
-            ruijieUserGroupId: "" // Update in Admin
+            ruijieProfileId: "67940168875442127021979345797676",
+            ruijieUserGroupId: "604465"
         },
         {
             id: "pkg_vip1",
@@ -41,8 +41,8 @@ const defaultData = {
             type: "vip",
             durationDays: 1,
             price: 5000,
-            ruijieProfileId: "",
-            ruijieUserGroupId: ""
+            ruijieProfileId: "34617871223073818252355027497339",
+            ruijieUserGroupId: "604466"
         },
         {
             id: "pkg_vip3",
@@ -50,8 +50,8 @@ const defaultData = {
             type: "vip",
             durationDays: 3,
             price: 12000,
-            ruijieProfileId: "",
-            ruijieUserGroupId: ""
+            ruijieProfileId: "99881056921180660397157978345666",
+            ruijieUserGroupId: "606182"
         },
         {
             id: "pkg_vip7",
@@ -59,8 +59,8 @@ const defaultData = {
             type: "vip",
             durationDays: 7,
             price: 25000,
-            ruijieProfileId: "",
-            ruijieUserGroupId: ""
+            ruijieProfileId: "41284419864201130841043286332278",
+            ruijieUserGroupId: "606183"
         },
         {
             id: "pkg_vip30",
@@ -68,8 +68,8 @@ const defaultData = {
             type: "vip",
             durationDays: 30,
             price: 80000,
-            ruijieProfileId: "",
-            ruijieUserGroupId: ""
+            ruijieProfileId: "76683500280644817580097882164296",
+            ruijieUserGroupId: "606184"
         }
     ]
 };

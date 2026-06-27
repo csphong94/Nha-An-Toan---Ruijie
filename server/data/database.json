@@ -1,0 +1,61 @@
+{
+  "adminPassword": "Abcd@2993",
+  "ruijie": {
+    "appId": "",
+    "appSecret": "",
+    "tokenStatic": "",
+    "groupId": ""
+  },
+  "portal": {
+    "title": "Vali 3 Captive Portal",
+    "subtitle": "Đăng nhập để sử dụng WiFi",
+    "themeColor": "#EAB308"
+  },
+  "packages": [
+    {
+      "id": "pkg_free",
+      "name": "Gói Free (5Mbps)",
+      "type": "free",
+      "durationDays": 30,
+      "price": 0,
+      "ruijieProfileId": "",
+      "ruijieUserGroupId": ""
+    },
+    {
+      "id": "pkg_vip1",
+      "name": "Gói VIP 1 Ngày",
+      "type": "vip",
+      "durationDays": 1,
+      "price": 5000,
+      "ruijieProfileId": "",
+      "ruijieUserGroupId": ""
+    },
+    {
+      "id": "pkg_vip3",
+      "name": "Gói VIP 3 Ngày",
+      "type": "vip",
+      "durationDays": 3,
+      "price": 12000,
+      "ruijieProfileId": "",
+      "ruijieUserGroupId": ""
+    },
+    {
+      "id": "pkg_vip7",
+      "name": "Gói VIP 7 Ngày",
+      "type": "vip",
+      "durationDays": 7,
+      "price": 25000,
+      "ruijieProfileId": "",
+      "ruijieUserGroupId": ""
+    },
+    {
+      "id": "pkg_vip30",
+      "name": "Gói VIP 30 Ngày",
+      "type": "vip",
+      "durationDays": 30,
+      "price": 80000,
+      "ruijieProfileId": "",
+      "ruijieUserGroupId": ""
+    }
+  ]
+}

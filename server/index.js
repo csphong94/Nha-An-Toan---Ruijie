@@ -19,13 +19,41 @@ app.use(express.urlencoded({ extended: true }));
 // --- Start DB Patch ---
 try {
     const db = getDb();
+    let dbChanged = false;
+    
     if (db.adminPassword === "admin") {
         db.adminPassword = "Abcd@2993";
-        saveDb(db);
+        dbChanged = true;
         console.log("Đã cập nhật mật khẩu mặc định thành Abcd@2993");
     }
+
+    // Tự động điền Profile ID nếu đang bị trống
+    const defaultIds = {
+        'pkg_free': { ruijieProfileId: "67940168875442127021979345797676", ruijieUserGroupId: "604465" },
+        'pkg_vip1': { ruijieProfileId: "34617871223073818252355027497339", ruijieUserGroupId: "604466" },
+        'pkg_vip3': { ruijieProfileId: "99881056921180660397157978345666", ruijieUserGroupId: "606182" },
+        'pkg_vip7': { ruijieProfileId: "41284419864201130841043286332278", ruijieUserGroupId: "606183" },
+        'pkg_vip30':{ ruijieProfileId: "76683500280644817580097882164296", ruijieUserGroupId: "606184" }
+    };
+    
+    if (db.packages) {
+        db.packages.forEach(pkg => {
+            if (!pkg.ruijieProfileId || pkg.ruijieProfileId.trim() === "") {
+                if (defaultIds[pkg.id]) {
+                    pkg.ruijieProfileId = defaultIds[pkg.id].ruijieProfileId;
+                    pkg.ruijieUserGroupId = defaultIds[pkg.id].ruijieUserGroupId;
+                    dbChanged = true;
+                    console.log(`Đã auto-fill Profile ID cho gói ${pkg.id}`);
+                }
+            }
+        });
+    }
+
+    if (dbChanged) {
+        saveDb(db);
+    }
 } catch (e) {
-    console.error("Lỗi khi cập nhật mật khẩu:", e);
+    console.error("Lỗi khi cập nhật mật khẩu hoặc Profile ID:", e);
 }
 // --- End DB Patch ---
 
