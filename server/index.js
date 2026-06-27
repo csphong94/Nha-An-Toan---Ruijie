@@ -49,6 +49,11 @@ try {
         });
     }
 
+    if (!db.vouchers) {
+        db.vouchers = [];
+        dbChanged = true;
+    }
+
     if (dbChanged) {
         saveDb(db);
     }
@@ -135,13 +140,12 @@ app.post('/api/auth/free', async (req, res) => {
 
 // API: Kích hoạt thủ công bằng mật khẩu Admin (Tiền mặt)
 app.post('/api/auth/admin-bypass', async (req, res) => {
-    const { password, packageId, mac, nas_mac, ssid, sessionId } = req.body;
-    if (!password || !packageId) return res.status(400).json({ error: 'Thiếu thông tin yêu cầu' });
+    const { password, packageId, mac, sessionId, customerName, customerPhone } = req.body;
     
     try {
         const db = getDb();
         if (password !== db.adminPassword) {
-            return res.status(401).json({ error: 'Mật khẩu Admin không đúng' });
+            return res.status(401).json({ error: 'Sai mật khẩu quản trị' });
         }
 
         const groupId = db.ruijie.groupId || "9105026"; 
@@ -156,6 +160,20 @@ app.post('/api/auth/admin-bypass', async (req, res) => {
 
         // Sinh Voucher
         const voucherCode = await generateVoucher(groupId, pkg.ruijieUserGroupId, pkg.ruijieProfileId);
+        
+        // Lưu lịch sử
+        db.vouchers.push({
+            id: Date.now().toString(),
+            voucherCode: voucherCode,
+            customerName: customerName || "Không nhập",
+            customerPhone: customerPhone || "Không nhập",
+            packageId: packageId,
+            packageName: pkg.name,
+            createdAt: new Date().toISOString(),
+            mac: mac || "N/A",
+            method: "admin"
+        });
+        saveDb(db);
         
         res.json({ success: true, authSuccess: true, voucherCode: voucherCode });
     } catch (error) {
@@ -183,7 +201,7 @@ const orderStorage = new Map();
 
 // API: Tạo thanh toán MoMo
 app.post('/api/payment/momo', async (req, res) => {
-    const { mac, sessionId, return_url, nas_mac, ssid, packageId } = req.body;
+    const { mac, sessionId, return_url, nas_mac, ssid, packageId, customerName, customerPhone } = req.body;
     
     const db = getDb();
     const pkg = db.packages.find(p => p.id === packageId);
@@ -198,7 +216,7 @@ app.post('/api/payment/momo', async (req, res) => {
     const requestType = 'captureWallet';
     
     // Gói dữ liệu hệ thống vào extraData (Base64)
-    const extraDataObj = { mac, sessionId, return_url, nas_mac, ssid, packageId };
+    const extraDataObj = { mac, sessionId, return_url, nas_mac, ssid, packageId, customerName, customerPhone };
     const extraData = Buffer.from(JSON.stringify(extraDataObj)).toString('base64');
     
     // Lưu tạm vào RAM
@@ -298,6 +316,20 @@ app.get('/api/payment/momo/return', async (req, res) => {
         if (!voucherCode) {
             voucherCode = await generateVoucher(groupId, pkg.ruijieUserGroupId, pkg.ruijieProfileId);
             orderStorage.set(orderId, { ...orderData, status: 'success', voucherCode });
+            
+            // Lưu lịch sử
+            db.vouchers.push({
+                id: orderId,
+                voucherCode: voucherCode,
+                customerName: orderData.extraDataObj.customerName || "Không nhập",
+                customerPhone: orderData.extraDataObj.customerPhone || "Không nhập",
+                packageId: packageId,
+                packageName: pkg.name,
+                createdAt: new Date().toISOString(),
+                mac: orderData.extraDataObj.mac || "N/A",
+                method: "momo"
+            });
+            saveDb(db);
         }
 
         // Chuyển hướng về Frontend của chúng ta (App.jsx) để hiển thị mã Voucher

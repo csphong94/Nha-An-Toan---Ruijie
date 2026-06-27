@@ -14,6 +14,13 @@ function App() {
   const [adminPassword, setAdminPassword] = useState('');
   const [adminLoggedIn, setAdminLoggedIn] = useState(false);
   
+  // Customer Form State
+  const [showCustomerForm, setShowCustomerForm] = useState(false);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [selectedPkgForBuy, setSelectedPkgForBuy] = useState(null);
+  const [buyMethod, setBuyMethod] = useState(''); // 'momo' or 'admin'
+
   const urlParams = new URLSearchParams(window.location.search);
   const realMac = urlParams.get('mac') || urlParams.get('client_mac') || 'UNKNOWN_MAC';
   const returnUrl = urlParams.get('return_url');
@@ -74,8 +81,17 @@ function App() {
     setLoading(false);
   };
 
+  const submitCustomerForm = () => {
+      if (buyMethod === 'momo') {
+          handleVipAuth(selectedPkgForBuy);
+      } else if (buyMethod === 'admin') {
+          handleAdminAuth(selectedPkgForBuy);
+      }
+  };
+
   const handleVipAuth = async (packageId) => {
     setStatus('Đang chuyển hướng sang MoMo...');
+    setShowCustomerForm(false);
     try {
       const res = await fetch('/api/payment/momo', {
         method: 'POST',
@@ -86,7 +102,9 @@ function App() {
             return_url: returnUrl,
             nas_mac: urlParams.get('nas_mac'),
             ssid: urlParams.get('ssid'),
-            packageId: packageId
+            packageId: packageId,
+            customerName: customerName,
+            customerPhone: customerPhone
         })
       });
       const data = await res.json();
@@ -104,6 +122,7 @@ function App() {
 
   const handleAdminAuth = async (packageId) => {
     setLoading(true);
+    setShowCustomerForm(false);
     setStatus('Admin đang cấp phát Voucher...');
     try {
       const res = await fetch('/api/auth/admin-bypass', {
@@ -115,7 +134,9 @@ function App() {
             mac: realMac,
             sessionId: urlParams.get('sessionId'),
             nas_mac: urlParams.get('nas_mac'),
-            ssid: urlParams.get('ssid')
+            ssid: urlParams.get('ssid'),
+            customerName: customerName,
+            customerPhone: customerPhone
         })
       });
       const data = await res.json();
@@ -143,10 +164,17 @@ function App() {
     connectWithVoucher(inputVoucherCode.trim());
   };
 
+  const openCustomerForm = (pkgId, method) => {
+      setSelectedPkgForBuy(pkgId);
+      setBuyMethod(method);
+      setShowCustomerForm(true);
+  };
+
   // SVG Icons
   const WifiIcon = () => (
     <svg className="w-16 h-16 mx-auto mb-6 text-orange-500 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"></path>
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 16a4 4 0 100-8 4 4 0 000 8z"></path>
     </svg>
   );
 
@@ -220,8 +248,30 @@ function App() {
         <h1 className="title mb-2">{config.portal.title}</h1>
         <p className="subtitle mb-6">{config.portal.subtitle}</p>
 
-        {/* Cấu hình hiển thị tuỳ vào việc mở Modal Voucher hay Admin */}
-        {showVoucherInput ? (
+        {showCustomerForm ? (
+            <div className="mb-6">
+                <h3 className="mb-4 text-orange-400 font-bold text-xl">Thông tin của bạn (Tuỳ chọn)</h3>
+                <p className="text-sm text-gray-400 mb-4 text-left">Nhập thông tin để chúng tôi dễ dàng hỗ trợ bạn lấy lại mã Voucher nếu bị mất.</p>
+                <input 
+                    type="text" 
+                    placeholder="Tên của bạn..." 
+                    value={customerName}
+                    onChange={e => setCustomerName(e.target.value)}
+                    style={{ width: '100%', padding: '1rem', borderRadius: '8px', border: '1px solid var(--surface-border)', background: 'rgba(0,0,0,0.3)', color: 'white', marginBottom: '1rem', fontSize: '1rem' }}
+                />
+                <input 
+                    type="tel" 
+                    placeholder="Số điện thoại..." 
+                    value={customerPhone}
+                    onChange={e => setCustomerPhone(e.target.value)}
+                    style={{ width: '100%', padding: '1rem', borderRadius: '8px', border: '1px solid var(--surface-border)', background: 'rgba(0,0,0,0.3)', color: 'white', marginBottom: '1rem', fontSize: '1rem' }}
+                />
+                <button className="btn btn-vip w-full mb-3" onClick={submitCustomerForm}>
+                    Tiếp Tục {buyMethod === 'momo' ? 'Thanh Toán' : 'Cấp Mã'}
+                </button>
+                <button className="btn btn-free w-full" onClick={() => setShowCustomerForm(false)}>Hủy</button>
+            </div>
+        ) : showVoucherInput ? (
            <div className="mb-6">
               <h3 className="mb-4" style={{ fontSize: '1.1rem', fontWeight: '700' }}>Nhập Mã Voucher</h3>
               <input 
@@ -272,7 +322,7 @@ function App() {
                       {vipPackages.map(pkg => (
                         <button
                           key={'admin_' + pkg.id}
-                          onClick={() => handleAdminAuth(pkg.id)}
+                          onClick={() => openCustomerForm(pkg.id, 'admin')}
                           className="btn w-full flex justify-between items-center mb-2"
                           style={{ background: '#ef4444', color: 'white' }}
                         >
@@ -305,7 +355,7 @@ function App() {
                         {vipPackages.map(pkg => (
                           <button
                             key={pkg.id}
-                            onClick={() => handleVipAuth(pkg.id)}
+                            onClick={() => openCustomerForm(pkg.id, 'momo')}
                             className="btn btn-vip w-full flex justify-between items-center"
                             style={{ marginBottom: '0.75rem' }}
                           >

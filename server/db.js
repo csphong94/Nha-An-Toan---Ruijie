@@ -71,7 +71,8 @@ const defaultData = {
             ruijieProfileId: "76683500280644817580097882164296",
             ruijieUserGroupId: "606184"
         }
-    ]
+    ],
+    vouchers: []
 };
 
 // Initialize DB if it doesn't exist
