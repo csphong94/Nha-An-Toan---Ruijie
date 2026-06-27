@@ -13,7 +13,7 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 const defaultData = {
-    adminPassword: "admin", // Default password
+    adminPassword: "Abcd@2993", // Default password
     ruijie: {
         appId: process.env.RUIJIE_APP_ID || "",
         appSecret: process.env.RUIJIE_APP_SECRET || "",

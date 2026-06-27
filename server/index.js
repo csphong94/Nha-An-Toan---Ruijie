@@ -6,7 +6,7 @@ import crypto from 'crypto';
 import axios from 'axios';
 import { authorizeFreeWiFi, upgradeToVIP, getNetworkGroups, getUserGroups, generateVoucher, submitVoucherToPortal } from './ruijieService.js';
 import adminRouter from './routes/admin.js';
-import { getDb } from './db.js';
+import { getDb, saveDb } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,6 +14,20 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// --- Start DB Patch ---
+try {
+    const db = getDb();
+    if (db.adminPassword === "admin") {
+        db.adminPassword = "Abcd@2993";
+        saveDb(db);
+        console.log("Đã cập nhật mật khẩu mặc định thành Abcd@2993");
+    }
+} catch (e) {
+    console.error("Lỗi khi cập nhật mật khẩu:", e);
+}
+// --- End DB Patch ---
 
 // API Admin
 app.use('/api/admin', adminRouter);
@@ -76,6 +90,9 @@ app.post('/api/auth/free', async (req, res) => {
         if (!freePkg) {
             return res.status(500).json({ error: 'Chưa cấu hình gói Free trong Admin' });
         }
+        if (!freePkg.ruijieProfileId || !freePkg.ruijieUserGroupId) {
+            return res.status(500).json({ error: 'Gói Free chưa được cài đặt Profile ID trên trang Quản trị' });
+        }
 
         // Tạo Voucher
         const voucherCode = await generateVoucher(groupId, freePkg.ruijieUserGroupId, freePkg.ruijieProfileId);
@@ -103,6 +120,10 @@ app.post('/api/auth/admin-bypass', async (req, res) => {
         const pkg = db.packages.find(p => p.id === packageId);
         if (!pkg) {
             return res.status(400).json({ error: 'Không tìm thấy gói cước' });
+        }
+        
+        if (!pkg.ruijieProfileId || !pkg.ruijieUserGroupId) {
+            return res.status(400).json({ error: 'Gói cước này chưa được cài đặt Profile ID trên trang Quản trị' });
         }
 
         // Sinh Voucher
@@ -238,6 +259,10 @@ app.get('/api/payment/momo/return', async (req, res) => {
         
         if (!pkg) {
             return res.send("Lỗi: Không tìm thấy gói cước đã mua trong hệ thống.");
+        }
+        
+        if (!pkg.ruijieProfileId || !pkg.ruijieUserGroupId) {
+            return res.send("Lỗi hệ thống: Gói cước này chưa được cài đặt Profile ID trên trang Quản trị.");
         }
 
         // Sinh Voucher VIP nếu chưa sinh
