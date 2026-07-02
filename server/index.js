@@ -198,7 +198,15 @@ app.post('/api/auth/admin-bypass', async (req, res) => {
             method: "admin"
         });
         saveDb(db);
-  // API: Tạo thanh toán PayOS
+        
+        res.json({ success: true, authSuccess: true, voucherCode: voucherCode });
+    } catch (error) {
+        console.error("Lỗi cấp voucher admin-bypass:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// API: Tạo thanh toán PayOS
 app.post('/api/payment/payos', async (req, res) => {
     const { mac, sessionId, return_url, nas_mac, ssid, packageId, customerName, customerPhone } = req.body;
     
