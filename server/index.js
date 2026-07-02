@@ -349,6 +349,44 @@ app.post('/api/payment/payos/webhook', async (req, res) => {
     }
 });
 
+// API: Đăng ký Webhook tự động cho PayOS
+app.post('/api/admin/payos/register-webhook', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'Chưa đăng nhập admin' });
+    }
+    const token = authHeader.split(' ')[1];
+    const db = getDb();
+    if (token !== db.adminToken) {
+        return res.status(401).json({ error: 'Token không hợp lệ' });
+    }
+
+    const payosSettings = db.payos || {};
+    if (!payosSettings.clientId || !payosSettings.apiKey || !payosSettings.checksumKey) {
+        return res.status(400).json({ error: 'Chưa cấu hình đầy đủ Client ID, API Key và Checksum Key của PayOS' });
+    }
+
+    const host = req.get('host');
+    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+    const baseUrl = process.env.RENDER_EXTERNAL_URL || `${protocol}://${host}`;
+    const webhookUrl = `${baseUrl}/api/payment/payos/webhook`;
+
+    try {
+        const payOS = new PayOS({
+            clientId: payosSettings.clientId,
+            apiKey: payosSettings.apiKey,
+            checksumKey: payosSettings.checksumKey
+        });
+
+        // Gọi API của PayOS để xác nhận URL webhook tự động
+        const result = await payOS.webhooks.confirm(webhookUrl);
+        res.json({ success: true, webhookUrl, result });
+    } catch (error) {
+        console.error("Lỗi đăng ký webhook tự động:", error);
+        res.status(500).json({ error: 'Lỗi đăng ký webhook: ' + error.message });
+    }
+});
+
 // API: Đón người dùng quay lại sau khi thanh toán trên cổng PayOS
 app.get('/api/payment/payos/return', async (req, res) => {
     const { orderCode } = req.query;

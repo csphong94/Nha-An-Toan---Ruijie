@@ -81,6 +81,32 @@ export default function Admin() {
     setLoading(false);
   };
 
+  const [webhookLoading, setWebhookLoading] = useState(false);
+  const [webhookStatus, setWebhookStatus] = useState('');
+
+  const handleRegisterWebhook = async () => {
+    setWebhookLoading(true);
+    setWebhookStatus('Đang gửi yêu cầu đăng ký Webhook...');
+    try {
+      const res = await fetch('/api/admin/payos/register-webhook', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        setWebhookStatus(`✅ Đăng ký Webhook thành công!\nĐịa chỉ: ${data.webhookUrl}`);
+      } else {
+        setWebhookStatus(`❌ Lỗi: ${data.error || 'Không xác định'}`);
+      }
+    } catch (err) {
+      setWebhookStatus('❌ Lỗi kết nối máy chủ');
+    }
+    setWebhookLoading(false);
+  };
+
   const handlePackageChange = (index, field, value) => {
     const newPackages = [...config.packages];
     newPackages[index] = { ...newPackages[index], [field]: value };
@@ -359,11 +385,28 @@ export default function Admin() {
                            <label className="block text-sm text-gray-400 mb-2">API Key</label>
                            <input type="text" value={config.payos?.apiKey || ''} onChange={e => setConfig({...config, payos: {...(config.payos || {}), apiKey: e.target.value}})} className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-orange-500 outline-none font-mono" placeholder="Nhập API Key từ PayOS" />
                         </div>
-                        <div className="md:col-span-2">
-                           <label className="block text-sm text-gray-400 mb-2">Checksum Key</label>
-                           <input type="password" value={config.payos?.checksumKey || ''} onChange={e => setConfig({...config, payos: {...(config.payos || {}), checksumKey: e.target.value}})} className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-orange-500 outline-none font-mono" placeholder="Nhập Checksum Key từ PayOS" />
-                        </div>
-                     </div>
+                         <div className="md:col-span-2">
+                            <label className="block text-sm text-gray-400 mb-2">Checksum Key</label>
+                            <input type="password" value={config.payos?.checksumKey || ''} onChange={e => setConfig({...config, payos: {...(config.payos || {}), checksumKey: e.target.value}})} className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-orange-500 outline-none font-mono" placeholder="Nhập Checksum Key từ PayOS" />
+                         </div>
+                         <div className="md:col-span-2 pt-4 border-t border-gray-700">
+                            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between bg-gray-900/60 p-4 rounded-xl border border-gray-700">
+                               <div>
+                                  <p className="font-bold text-white">Đăng ký Webhook Tự Động</p>
+                                  <p className="text-sm text-gray-400 mb-1">Hệ thống sẽ tự động gọi API đăng ký liên kết Webhook với tài khoản PayOS của bạn.</p>
+                                  {webhookStatus && <div className="mt-2 text-xs font-mono text-orange-400 whitespace-pre-wrap bg-gray-900 p-2 rounded border border-gray-750">{webhookStatus}</div>}
+                               </div>
+                               <button 
+                                  type="button"
+                                  disabled={webhookLoading}
+                                  onClick={handleRegisterWebhook}
+                                  className="w-full sm:w-auto bg-green-600 hover:bg-green-500 disabled:bg-gray-750 text-white px-5 py-2.5 rounded-lg font-bold transition-all shadow-md shrink-0"
+                               >
+                                  {webhookLoading ? 'Đang gửi...' : '🔗 Đăng ký tự động'}
+                               </button>
+                            </div>
+                         </div>
+                      </div>
                   </div>
                )}
 
