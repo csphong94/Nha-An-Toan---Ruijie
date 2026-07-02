@@ -59,6 +59,17 @@ try {
         dbChanged = true;
     }
 
+    if (!db.momo) {
+        db.momo = {
+            partnerCode: "",
+            accessKey: "",
+            secretKey: "",
+            endpoint: "https://test-payment.momo.vn/v2/gateway/api/create",
+            useMock: true
+        };
+        dbChanged = true;
+    }
+
     if (dbChanged) {
         saveDb(db);
     }
@@ -191,19 +202,6 @@ app.post('/api/auth/admin-bypass', async (req, res) => {
 });
 
 
-// Cấu hình MoMo Sandbox
-const MOMO_CONFIG = {
-    partnerCode: process.env.MOMO_PARTNER_CODE || 'MOMO',
-    accessKey: process.env.MOMO_ACCESS_KEY || 'M8brj9K6E22vXoDB',
-    secretKey: process.env.MOMO_SECRET_KEY || 'nqQiVSgDMy809JoPF6OzP5OdBUB550Y4',
-    endpoint: 'https://test-payment.momo.vn/v2/gateway/api/create',
-    returnUrl: process.env.RENDER_EXTERNAL_URL ? `${process.env.RENDER_EXTERNAL_URL}/api/payment/momo/return` : 'http://localhost:3000/api/payment/momo/return',
-    ipnUrl: process.env.RENDER_EXTERNAL_URL ? `${process.env.RENDER_EXTERNAL_URL}/api/payment/momo/ipn` : 'http://localhost:3000/api/payment/momo/ipn'
-};
-
-const VIP_USER_GROUP_ID = "604466";
-const VIP_PROFILE_ID = "34617871223073818252355027497339";
-
 // Bộ nhớ đệm lưu orderId để sinh Voucher 1 lần
 const orderStorage = new Map();
 
@@ -217,9 +215,25 @@ app.post('/api/payment/momo', async (req, res) => {
         return res.status(400).json({ error: 'Gói cước không hợp lệ' });
     }
 
+    const momoSettings = db.momo || {};
+    
+    // Đọc thông số cấu hình MoMo (Động từ DB hoặc Env)
+    const partnerCode = momoSettings.partnerCode || process.env.MOMO_PARTNER_CODE || 'MOMO';
+    const accessKey = momoSettings.accessKey || process.env.MOMO_ACCESS_KEY || 'M8brj9K6E22vXoDB';
+    const secretKey = momoSettings.secretKey || process.env.MOMO_SECRET_KEY || 'nqQiVSgDMy809JoPF6OzP5OdBUB550Y4';
+    const endpoint = momoSettings.endpoint || 'https://test-payment.momo.vn/v2/gateway/api/create';
+    const useMock = momoSettings.useMock !== undefined ? momoSettings.useMock : (process.env.USE_MOMO_MOCK !== 'false');
+
+    // Tự động phân giải đường dẫn tuyệt đối cho MoMo Callbacks
+    const host = req.get('host');
+    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+    const baseUrl = process.env.RENDER_EXTERNAL_URL || `${protocol}://${host}`;
+    const returnUrl = `${baseUrl}/api/payment/momo/return`;
+    const ipnUrl = `${baseUrl}/api/payment/momo/ipn`;
+
     const amount = String(pkg.price);
     const orderInfo = `Mua gói ${pkg.name}`;
-    const orderId = MOMO_CONFIG.partnerCode + new Date().getTime();
+    const orderId = partnerCode + new Date().getTime();
     const requestId = orderId;
     const requestType = 'captureWallet';
     
@@ -233,39 +247,37 @@ app.post('/api/payment/momo', async (req, res) => {
     // Lưu tạm vào RAM
     orderStorage.set(orderId, { status: 'pending', extraDataObj });
 
-    // Cờ kích hoạt chế độ giả lập (Mock) nếu chưa có API Key thật
-    const USE_MOCK = process.env.USE_MOMO_MOCK !== 'false'; 
-
-    if (USE_MOCK) {
-        // Giả lập trả về trang thanh toán ảo
+    if (useMock) {
+        // Giả lập trả về trang thanh toán ảo (Dùng URL tuyệt đối để tránh lỗi Captive Portal browser)
         return res.json({
             success: true,
-            payUrl: `/mock/momo/pay?orderId=${orderId}&amount=${amount}`
+            payUrl: `${baseUrl}/mock/momo/pay?orderId=${orderId}&amount=${amount}`
         });
     }
 
     // Luồng gọi MoMo thật
-    const rawSignature = `accessKey=${MOMO_CONFIG.accessKey}&amount=${amount}&extraData=${extraData}&ipnUrl=${MOMO_CONFIG.ipnUrl}&orderId=${orderId}&orderInfo=${orderInfo}&partnerCode=${MOMO_CONFIG.partnerCode}&redirectUrl=${MOMO_CONFIG.returnUrl}&requestId=${requestId}&requestType=${requestType}`;
-    const signature = crypto.createHmac('sha256', MOMO_CONFIG.secretKey).update(rawSignature).digest('hex');
+    const rawSignature = `accessKey=${accessKey}&amount=${amount}&extraData=${extraData}&ipnUrl=${ipnUrl}&orderId=${orderId}&orderInfo=${orderInfo}&partnerCode=${partnerCode}&redirectUrl=${returnUrl}&requestId=${requestId}&requestType=${requestType}`;
+    const signature = crypto.createHmac('sha256', secretKey).update(rawSignature).digest('hex');
 
     const requestBody = {
-        partnerCode: MOMO_CONFIG.partnerCode,
+        partnerCode,
         partnerName: "Vali WiFi",
         storeId: "ValiWiFi",
         requestId, amount, orderId, orderInfo,
-        redirectUrl: MOMO_CONFIG.returnUrl,
-        ipnUrl: MOMO_CONFIG.ipnUrl,
+        redirectUrl: returnUrl,
+        ipnUrl,
         lang: "vi", requestType, autoCapture: true, extraData, signature
     };
 
     try {
-        const response = await axios.post(MOMO_CONFIG.endpoint, requestBody);
+        const response = await axios.post(endpoint, requestBody);
         if (response.data && response.data.payUrl) {
             res.json({ success: true, payUrl: response.data.payUrl });
         } else {
             res.status(400).json({ error: 'Lỗi tạo thanh toán MoMo', details: response.data });
         }
     } catch (e) {
+        console.error("Lỗi MoMo:", e.response ? e.response.data : e.message);
         res.status(500).json({ error: 'Lỗi kết nối MoMo' });
     }
 });

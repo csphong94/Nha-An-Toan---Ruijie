@@ -72,7 +72,14 @@ const defaultData = {
             ruijieUserGroupId: "606184"
         }
     ],
-    vouchers: []
+    vouchers: [],
+    momo: {
+        partnerCode: "",
+        accessKey: "",
+        secretKey: "",
+        endpoint: "https://test-payment.momo.vn/v2/gateway/api/create",
+        useMock: true
+    }
 };
 
 // Initialize DB if it doesn't exist

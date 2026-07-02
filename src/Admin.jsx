@@ -164,6 +164,12 @@ export default function Admin() {
                <span>📦</span> Quản lý Gói cước
             </button>
             <button 
+               onClick={() => setActiveTab('momo')}
+               className={`w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors ${activeTab === 'momo' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white'}`}
+            >
+               <span>💳</span> Cấu hình MoMo
+            </button>
+            <button 
                onClick={() => setActiveTab('portal')}
                className={`w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors ${activeTab === 'portal' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white'}`}
             >
@@ -195,6 +201,7 @@ export default function Admin() {
                <h2 className="text-3xl font-bold text-white">
                   {activeTab === 'vouchers' && 'Khách hàng & Voucher'}
                   {activeTab === 'packages' && 'Quản lý Gói Mạng'}
+                  {activeTab === 'momo' && 'Cấu hình MoMo API'}
                   {activeTab === 'portal' && 'Giao diện Trang Chào'}
                   {activeTab === 'ruijie' && 'Cấu hình Ruijie API'}
                </h2>
@@ -312,6 +319,55 @@ export default function Admin() {
                               </div>
                            </div>
                         ))}
+                     </div>
+                  </div>
+               )}
+
+               {/* TAB: MOMO */}
+               {activeTab === 'momo' && (
+                  <div>
+                     <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-xl mb-6">
+                        <p className="text-yellow-400 text-sm">⚠️ <strong>Lưu ý:</strong> Khi tắt Chế độ Giả lập, hệ thống sẽ thực hiện giao dịch qua tài khoản MoMo thật của bạn. Hãy đảm bảo bạn điền chính xác các khóa được cấp từ MoMo.</p>
+                     </div>
+                     
+                     <div className="mb-6 flex items-center justify-between bg-gray-900 p-4 rounded-xl border border-gray-700">
+                        <div>
+                           <p className="font-bold text-lg text-white">Chế độ Giả lập (Mock Mode)</p>
+                           <p className="text-sm text-gray-400">Cho phép thử nghiệm thanh toán ảo mà không tốn tiền thật.</p>
+                        </div>
+                        <div>
+                           <label className="relative inline-flex items-center cursor-pointer">
+                              <input 
+                                 type="checkbox" 
+                                 checked={config.momo?.useMock ?? true} 
+                                 onChange={e => setConfig({...config, momo: {...(config.momo || {}), useMock: e.target.checked}})}
+                                 className="sr-only peer" 
+                              />
+                              <div className="w-14 h-7 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-orange-600"></div>
+                           </label>
+                        </div>
+                     </div>
+
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                           <label className="block text-sm text-gray-400 mb-2">Partner Code</label>
+                           <input type="text" value={config.momo?.partnerCode || ''} onChange={e => setConfig({...config, momo: {...(config.momo || {}), partnerCode: e.target.value}})} className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-orange-500 outline-none font-mono" placeholder="MOMO" />
+                        </div>
+                        <div>
+                           <label className="block text-sm text-gray-400 mb-2">Access Key</label>
+                           <input type="text" value={config.momo?.accessKey || ''} onChange={e => setConfig({...config, momo: {...(config.momo || {}), accessKey: e.target.value}})} className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-orange-500 outline-none font-mono" />
+                        </div>
+                        <div className="md:col-span-2">
+                           <label className="block text-sm text-gray-400 mb-2">Secret Key</label>
+                           <input type="password" value={config.momo?.secretKey || ''} onChange={e => setConfig({...config, momo: {...(config.momo || {}), secretKey: e.target.value}})} className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-orange-500 outline-none font-mono" />
+                        </div>
+                        <div className="md:col-span-2">
+                           <label className="block text-sm text-gray-400 mb-2">MoMo API Endpoint</label>
+                           <select value={config.momo?.endpoint || 'https://test-payment.momo.vn/v2/gateway/api/create'} onChange={e => setConfig({...config, momo: {...(config.momo || {}), endpoint: e.target.value}})} className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-orange-500 outline-none">
+                              <option value="https://test-payment.momo.vn/v2/gateway/api/create">Môi trường Thử nghiệm (Sandbox)</option>
+                              <option value="https://payment.momo.vn/v2/gateway/api/create">Môi trường Thực tế (Production)</option>
+                           </select>
+                        </div>
                      </div>
                   </div>
                )}
