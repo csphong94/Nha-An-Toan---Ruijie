@@ -85,7 +85,19 @@ export function getDb() {
         const raw = fs.readFileSync(DB_FILE, 'utf-8');
         return JSON.parse(raw);
     } catch (err) {
-        console.error("Lỗi đọc database, trả về mặc định:", err);
+        console.error("Lỗi đọc database, cố gắng phục hồi từ backup:", err);
+        const backupFile = DB_FILE + '.bak';
+        if (fs.existsSync(backupFile)) {
+            try {
+                const rawBak = fs.readFileSync(backupFile, 'utf-8');
+                const parsed = JSON.parse(rawBak);
+                fs.writeFileSync(DB_FILE, rawBak, 'utf-8');
+                console.log("Đã phục hồi thành công database từ tệp backup.");
+                return parsed;
+            } catch (bakErr) {
+                console.error("Lỗi đọc tệp backup:", bakErr);
+            }
+        }
         return defaultData;
     }
 }

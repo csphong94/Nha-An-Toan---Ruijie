@@ -3,6 +3,11 @@ import { getDb, saveDb } from '../db.js';
 
 const router = express.Router();
 
+const cleanInput = (str) => {
+    if (!str) return '';
+    return String(str).replace(/<[^>]*>/g, '').trim().substring(0, 300);
+};
+
 // Middleware xác thực Admin đơn giản bằng mật khẩu truyền qua header
 function authAdmin(req, res, next) {
     const authHeader = req.headers['authorization'];
@@ -45,7 +50,35 @@ router.get('/config', authAdmin, (req, res) => {
 // Cập nhật cấu hình (Dành cho trang Admin)
 router.put('/config', authAdmin, (req, res) => {
     const newData = req.body;
-    // Cập nhật đè lên DB cũ
+    
+    // Sanitize Portal Config
+    if (newData.portal) {
+        newData.portal.title = cleanInput(newData.portal.title);
+        newData.portal.subtitle = cleanInput(newData.portal.subtitle);
+        newData.portal.themeColor = cleanInput(newData.portal.themeColor);
+    }
+    
+    // Sanitize Ruijie API Config
+    if (newData.ruijie) {
+        newData.ruijie.appId = cleanInput(newData.ruijie.appId);
+        newData.ruijie.appSecret = cleanInput(newData.ruijie.appSecret);
+        newData.ruijie.tokenStatic = cleanInput(newData.ruijie.tokenStatic);
+        newData.ruijie.groupId = cleanInput(newData.ruijie.groupId);
+    }
+    
+    // Sanitize Packages
+    if (Array.isArray(newData.packages)) {
+        newData.packages = newData.packages.map(pkg => ({
+            id: cleanInput(pkg.id),
+            name: cleanInput(pkg.name),
+            type: cleanInput(pkg.type),
+            durationDays: parseInt(pkg.durationDays) || 1,
+            price: parseInt(pkg.price) || 0,
+            ruijieProfileId: cleanInput(pkg.ruijieProfileId),
+            ruijieUserGroupId: cleanInput(pkg.ruijieUserGroupId)
+        }));
+    }
+
     const currentDb = getDb();
     const updatedDb = { ...currentDb, ...newData };
     
