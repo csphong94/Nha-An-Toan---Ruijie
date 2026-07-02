@@ -449,7 +449,7 @@ app.get('/api/payment/payos/return', async (req, res) => {
         });
 
         // Chủ động gọi API kiểm tra trạng thái thanh toán trực tiếp từ PayOS (đề phòng webhook trễ)
-        const paymentInfo = await payOS.paymentRequests.getPaymentLinkInformation(orderCode);
+        const paymentInfo = await payOS.paymentRequests.getPaymentLinkInformation(parseInt(orderCode, 10));
         
         if (paymentInfo && paymentInfo.status === 'PAID') {
             if (!pending.voucherCode) {
@@ -482,7 +482,7 @@ app.get('/api/payment/payos/return', async (req, res) => {
         }
     } catch (error) {
         console.error("Lỗi kiểm tra trạng thái thanh toán PayOS:", error);
-        res.send("Có lỗi xảy ra hoặc giao dịch chưa được xác nhận. Vui lòng thử lại.");
+        res.send(`Lỗi xác minh thanh toán: ${error.message} (${error.code || 'NO_CODE'}). Vui lòng chụp ảnh màn hình này gửi lỗi để tôi hỗ trợ.`);
     }
 });
 
