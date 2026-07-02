@@ -82,7 +82,7 @@ function App() {
   };
 
   const submitCustomerForm = () => {
-      if (buyMethod === 'momo') {
+      if (buyMethod === 'payos' || buyMethod === 'momo') {
           handleVipAuth(selectedPkgForBuy);
       } else if (buyMethod === 'admin') {
           handleAdminAuth(selectedPkgForBuy);
@@ -90,10 +90,10 @@ function App() {
   };
 
   const handleVipAuth = async (packageId) => {
-    setStatus('Đang chuyển hướng sang MoMo...');
+    setStatus('Đang chuyển hướng sang cổng VietQR...');
     setShowCustomerForm(false);
     try {
-      const res = await fetch('/api/payment/momo', {
+      const res = await fetch('/api/payment/payos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -111,11 +111,11 @@ function App() {
       if (data.payUrl) {
         window.location.href = data.payUrl;
       } else {
-        setStatus('Lỗi tạo thanh toán MoMo: ' + JSON.stringify(data.error));
+        setStatus('Lỗi tạo thanh toán VietQR: ' + JSON.stringify(data.error));
         setTimeout(() => setStatus(null), 3000);
       }
     } catch (err) {
-      setStatus('Lỗi kết nối máy chủ khi tạo thanh toán MoMo');
+      setStatus('Lỗi kết nối máy chủ khi tạo thanh toán VietQR');
       setTimeout(() => setStatus(null), 3000);
     }
   };
@@ -355,7 +355,7 @@ function App() {
                         {vipPackages.map(pkg => (
                           <button
                             key={pkg.id}
-                            onClick={() => openCustomerForm(pkg.id, 'momo')}
+                            onClick={() => openCustomerForm(pkg.id, 'payos')}
                             className="btn btn-vip w-full flex justify-between items-center"
                             style={{ marginBottom: '0.75rem' }}
                           >

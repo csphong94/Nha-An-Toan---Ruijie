@@ -164,10 +164,10 @@ export default function Admin() {
                <span>📦</span> Quản lý Gói cước
             </button>
             <button 
-               onClick={() => setActiveTab('momo')}
-               className={`w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors ${activeTab === 'momo' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white'}`}
+               onClick={() => setActiveTab('payos')}
+               className={`w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors ${activeTab === 'payos' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-white'}`}
             >
-               <span>💳</span> Cấu hình MoMo
+               <span>💳</span> Cấu hình PayOS
             </button>
             <button 
                onClick={() => setActiveTab('portal')}
@@ -201,7 +201,7 @@ export default function Admin() {
                <h2 className="text-3xl font-bold text-white">
                   {activeTab === 'vouchers' && 'Khách hàng & Voucher'}
                   {activeTab === 'packages' && 'Quản lý Gói Mạng'}
-                  {activeTab === 'momo' && 'Cấu hình MoMo API'}
+                  {activeTab === 'payos' && 'Cấu hình PayOS API'}
                   {activeTab === 'portal' && 'Giao diện Trang Chào'}
                   {activeTab === 'ruijie' && 'Cấu hình Ruijie API'}
                </h2>
@@ -257,8 +257,10 @@ export default function Admin() {
                                        <td className="p-4 font-mono text-green-400 font-bold tracking-widest">{v.voucherCode}</td>
                                        <td className="p-4 text-gray-400 text-sm">{new Date(v.createdAt).toLocaleString('vi-VN')}</td>
                                        <td className="p-4">
-                                          {v.method === 'momo' ? (
-                                             <span className="bg-pink-500/20 text-pink-400 px-2 py-1 rounded text-xs">MoMo</span>
+                                          {v.method === 'payos_webhook' || v.method === 'payos_direct' ? (
+                                             <span className="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs">VietQR</span>
+                                          ) : v.method === 'payos_mock' ? (
+                                             <span className="bg-purple-500/20 text-purple-400 px-2 py-1 rounded text-xs">Mock QR</span>
                                           ) : (
                                              <span className="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs">Admin</span>
                                           )}
@@ -297,7 +299,7 @@ export default function Admin() {
                                     <label className="block text-sm text-gray-400 mb-2">Loại gói</label>
                                     <select value={pkg.type} onChange={e => handlePackageChange(idx, 'type', e.target.value)} className="w-full p-3 rounded-lg bg-gray-800 border border-gray-600 focus:border-orange-500 outline-none">
                                        <option value="free">Miễn phí (Free)</option>
-                                       <option value="vip">Thu phí MoMo (VIP)</option>
+                                       <option value="vip">Thu phí Ngân hàng (VIP)</option>
                                     </select>
                                  </div>
                                  <div>
@@ -323,24 +325,24 @@ export default function Admin() {
                   </div>
                )}
 
-               {/* TAB: MOMO */}
-               {activeTab === 'momo' && (
+               {/* TAB: PAYOS */}
+               {activeTab === 'payos' && (
                   <div>
                      <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-xl mb-6">
-                        <p className="text-yellow-400 text-sm">⚠️ <strong>Lưu ý:</strong> Khi tắt Chế độ Giả lập, hệ thống sẽ thực hiện giao dịch qua tài khoản MoMo thật của bạn. Hãy đảm bảo bạn điền chính xác các khóa được cấp từ MoMo.</p>
+                        <p className="text-yellow-400 text-sm">⚠️ <strong>Lưu ý:</strong> Khi tắt Chế độ Giả lập, hệ thống sẽ kết nối với cổng PayOS thực tế của bạn. Đảm bảo cấu hình đúng 3 mã Client ID, API Key, và Checksum Key.</p>
                      </div>
                      
                      <div className="mb-6 flex items-center justify-between bg-gray-900 p-4 rounded-xl border border-gray-700">
                         <div>
                            <p className="font-bold text-lg text-white">Chế độ Giả lập (Mock Mode)</p>
-                           <p className="text-sm text-gray-400">Cho phép thử nghiệm thanh toán ảo mà không tốn tiền thật.</p>
+                           <p className="text-sm text-gray-400">Cho phép thử nghiệm thanh toán VietQR ảo mà không tốn tiền thật.</p>
                         </div>
                         <div>
                            <label className="relative inline-flex items-center cursor-pointer">
                               <input 
                                  type="checkbox" 
-                                 checked={config.momo?.useMock ?? true} 
-                                 onChange={e => setConfig({...config, momo: {...(config.momo || {}), useMock: e.target.checked}})}
+                                 checked={config.payos?.useMock ?? true} 
+                                 onChange={e => setConfig({...config, payos: {...(config.payos || {}), useMock: e.target.checked}})}
                                  className="sr-only peer" 
                               />
                               <div className="w-14 h-7 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-orange-600"></div>
@@ -349,24 +351,17 @@ export default function Admin() {
                      </div>
 
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                           <label className="block text-sm text-gray-400 mb-2">Partner Code</label>
-                           <input type="text" value={config.momo?.partnerCode || ''} onChange={e => setConfig({...config, momo: {...(config.momo || {}), partnerCode: e.target.value}})} className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-orange-500 outline-none font-mono" placeholder="MOMO" />
-                        </div>
-                        <div>
-                           <label className="block text-sm text-gray-400 mb-2">Access Key</label>
-                           <input type="text" value={config.momo?.accessKey || ''} onChange={e => setConfig({...config, momo: {...(config.momo || {}), accessKey: e.target.value}})} className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-orange-500 outline-none font-mono" />
+                        <div className="md:col-span-2">
+                           <label className="block text-sm text-gray-400 mb-2">Client ID</label>
+                           <input type="text" value={config.payos?.clientId || ''} onChange={e => setConfig({...config, payos: {...(config.payos || {}), clientId: e.target.value}})} className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-orange-500 outline-none font-mono" placeholder="Nhập Client ID từ PayOS" />
                         </div>
                         <div className="md:col-span-2">
-                           <label className="block text-sm text-gray-400 mb-2">Secret Key</label>
-                           <input type="password" value={config.momo?.secretKey || ''} onChange={e => setConfig({...config, momo: {...(config.momo || {}), secretKey: e.target.value}})} className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-orange-500 outline-none font-mono" />
+                           <label className="block text-sm text-gray-400 mb-2">API Key</label>
+                           <input type="text" value={config.payos?.apiKey || ''} onChange={e => setConfig({...config, payos: {...(config.payos || {}), apiKey: e.target.value}})} className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-orange-500 outline-none font-mono" placeholder="Nhập API Key từ PayOS" />
                         </div>
                         <div className="md:col-span-2">
-                           <label className="block text-sm text-gray-400 mb-2">MoMo API Endpoint</label>
-                           <select value={config.momo?.endpoint || 'https://test-payment.momo.vn/v2/gateway/api/create'} onChange={e => setConfig({...config, momo: {...(config.momo || {}), endpoint: e.target.value}})} className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-orange-500 outline-none">
-                              <option value="https://test-payment.momo.vn/v2/gateway/api/create">Môi trường Thử nghiệm (Sandbox)</option>
-                              <option value="https://payment.momo.vn/v2/gateway/api/create">Môi trường Thực tế (Production)</option>
-                           </select>
+                           <label className="block text-sm text-gray-400 mb-2">Checksum Key</label>
+                           <input type="password" value={config.payos?.checksumKey || ''} onChange={e => setConfig({...config, payos: {...(config.payos || {}), checksumKey: e.target.value}})} className="w-full p-3 rounded-lg bg-gray-900 border border-gray-700 focus:border-orange-500 outline-none font-mono" placeholder="Nhập Checksum Key từ PayOS" />
                         </div>
                      </div>
                   </div>

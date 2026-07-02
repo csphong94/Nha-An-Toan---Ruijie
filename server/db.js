@@ -73,13 +73,13 @@ const defaultData = {
         }
     ],
     vouchers: [],
-    momo: {
-        partnerCode: "",
-        accessKey: "",
-        secretKey: "",
-        endpoint: "https://test-payment.momo.vn/v2/gateway/api/create",
-        useMock: true
-    }
+    payos: {
+        clientId: "75c589e8-d919-44ad-8e29-816621bd65f0",
+        apiKey: "7aa63cb4-7333-4b46-b308-346b1a034e12",
+        checksumKey: "4f35df819a0a77965694f0f4e618703e1ac74388f53883d9b4f06e60847df3d3",
+        useMock: false
+    },
+    pendingPayments: {}
 };
 
 // Initialize DB if it doesn't exist

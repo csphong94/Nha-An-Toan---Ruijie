@@ -79,13 +79,12 @@ router.put('/config', authAdmin, (req, res) => {
         }));
     }
 
-    // Sanitize MoMo Config
-    if (newData.momo) {
-        newData.momo.partnerCode = cleanInput(newData.momo.partnerCode);
-        newData.momo.accessKey = cleanInput(newData.momo.accessKey);
-        newData.momo.secretKey = cleanInput(newData.momo.secretKey);
-        newData.momo.endpoint = cleanInput(newData.momo.endpoint);
-        newData.momo.useMock = !!newData.momo.useMock;
+    // Sanitize PayOS Config
+    if (newData.payos) {
+        newData.payos.clientId = cleanInput(newData.payos.clientId);
+        newData.payos.apiKey = cleanInput(newData.payos.apiKey);
+        newData.payos.checksumKey = cleanInput(newData.payos.checksumKey);
+        newData.payos.useMock = !!newData.payos.useMock;
     }
 
     const currentDb = getDb();

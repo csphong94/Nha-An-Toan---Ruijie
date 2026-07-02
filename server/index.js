@@ -7,6 +7,7 @@ import axios from 'axios';
 import { authorizeFreeWiFi, upgradeToVIP, getNetworkGroups, getUserGroups, generateVoucher, submitVoucherToPortal } from './ruijieService.js';
 import adminRouter from './routes/admin.js';
 import { getDb, saveDb } from './db.js';
+import { PayOS } from '@payos/node';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,14 +60,18 @@ try {
         dbChanged = true;
     }
 
-    if (!db.momo) {
-        db.momo = {
-            partnerCode: "",
-            accessKey: "",
-            secretKey: "",
-            endpoint: "https://test-payment.momo.vn/v2/gateway/api/create",
-            useMock: true
+    if (!db.payos) {
+        db.payos = {
+            clientId: "75c589e8-d919-44ad-8e29-816621bd65f0",
+            apiKey: "7aa63cb4-7333-4b46-b308-346b1a034e12",
+            checksumKey: "4f35df819a0a77965694f0f4e618703e1ac74388f53883d9b4f06e60847df3d3",
+            useMock: false
         };
+        dbChanged = true;
+    }
+
+    if (!db.pendingPayments) {
+        db.pendingPayments = {};
         dbChanged = true;
     }
 
@@ -193,20 +198,8 @@ app.post('/api/auth/admin-bypass', async (req, res) => {
             method: "admin"
         });
         saveDb(db);
-        
-        res.json({ success: true, authSuccess: true, voucherCode: voucherCode });
-    } catch (error) {
-        console.error("Lỗi cấp voucher admin-bypass:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-
-// Bộ nhớ đệm lưu orderId để sinh Voucher 1 lần
-const orderStorage = new Map();
-
-// API: Tạo thanh toán MoMo
-app.post('/api/payment/momo', async (req, res) => {
+  // API: Tạo thanh toán PayOS
+app.post('/api/payment/payos', async (req, res) => {
     const { mac, sessionId, return_url, nas_mac, ssid, packageId, customerName, customerPhone } = req.body;
     
     const db = getDb();
@@ -214,91 +207,88 @@ app.post('/api/payment/momo', async (req, res) => {
     if (!pkg) {
         return res.status(400).json({ error: 'Gói cước không hợp lệ' });
     }
-
-    const momoSettings = db.momo || {};
     
-    // Đọc thông số cấu hình MoMo (Động từ DB hoặc Env)
-    const partnerCode = momoSettings.partnerCode || process.env.MOMO_PARTNER_CODE || 'MOMO';
-    const accessKey = momoSettings.accessKey || process.env.MOMO_ACCESS_KEY || 'M8brj9K6E22vXoDB';
-    const secretKey = momoSettings.secretKey || process.env.MOMO_SECRET_KEY || 'nqQiVSgDMy809JoPF6OzP5OdBUB550Y4';
-    const endpoint = momoSettings.endpoint || 'https://test-payment.momo.vn/v2/gateway/api/create';
-    const useMock = momoSettings.useMock !== undefined ? momoSettings.useMock : (process.env.USE_MOMO_MOCK !== 'false');
+    if (!pkg.ruijieProfileId || !pkg.ruijieUserGroupId) {
+        return res.status(400).json({ error: 'Gói cước này chưa được cài đặt Profile ID trên trang Quản trị' });
+    }
 
-    // Tự động phân giải đường dẫn tuyệt đối cho MoMo Callbacks
+    const payosSettings = db.payos || {};
+    const useMock = payosSettings.useMock !== undefined ? payosSettings.useMock : false;
+
+    // Tự động phân giải đường dẫn tuyệt đối cho PayOS Callbacks
     const host = req.get('host');
     const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
     const baseUrl = process.env.RENDER_EXTERNAL_URL || `${protocol}://${host}`;
-    const returnUrl = `${baseUrl}/api/payment/momo/return`;
-    const ipnUrl = `${baseUrl}/api/payment/momo/ipn`;
-
-    const amount = String(pkg.price);
-    const orderInfo = `Mua gói ${pkg.name}`;
-    const orderId = partnerCode + new Date().getTime();
-    const requestId = orderId;
-    const requestType = 'captureWallet';
+    
+    const orderCode = Math.floor(Date.now() / 1000); // Mã đơn hàng số nguyên 10 số
     
     const cleanName = cleanInput(customerName) || "Không nhập";
     const cleanPhone = cleanInput(customerPhone) || "Không nhập";
-
-    // Gói dữ liệu hệ thống vào extraData (Base64)
-    const extraDataObj = { mac, sessionId, return_url, nas_mac, ssid, packageId, customerName: cleanName, customerPhone: cleanPhone };
-    const extraData = Buffer.from(JSON.stringify(extraDataObj)).toString('base64');
     
-    // Lưu tạm vào RAM
-    orderStorage.set(orderId, { status: 'pending', extraDataObj });
+    // Lưu thông tin phiên thanh toán tạm vào database
+    db.pendingPayments[orderCode] = {
+        status: 'pending',
+        mac: mac || 'N/A',
+        sessionId: sessionId || '',
+        returnUrl: return_url || '',
+        nas_mac: nas_mac || '',
+        ssid: ssid || '',
+        packageId: packageId,
+        packageName: pkg.name,
+        customerName: cleanName,
+        customerPhone: cleanPhone,
+        createdAt: new Date().toISOString()
+    };
+    saveDb(db);
 
     if (useMock) {
-        // Giả lập trả về trang thanh toán ảo (Dùng URL tuyệt đối để tránh lỗi Captive Portal browser)
+        // Giả lập trả về trang thanh toán ảo
         return res.json({
             success: true,
-            payUrl: `${baseUrl}/mock/momo/pay?orderId=${orderId}&amount=${amount}`
+            payUrl: `${baseUrl}/mock/payos/pay?orderCode=${orderCode}&amount=${pkg.price}`
         });
     }
 
-    // Luồng gọi MoMo thật
-    const rawSignature = `accessKey=${accessKey}&amount=${amount}&extraData=${extraData}&ipnUrl=${ipnUrl}&orderId=${orderId}&orderInfo=${orderInfo}&partnerCode=${partnerCode}&redirectUrl=${returnUrl}&requestId=${requestId}&requestType=${requestType}`;
-    const signature = crypto.createHmac('sha256', secretKey).update(rawSignature).digest('hex');
-
-    const requestBody = {
-        partnerCode,
-        partnerName: "Vali WiFi",
-        storeId: "ValiWiFi",
-        requestId, amount, orderId, orderInfo,
-        redirectUrl: returnUrl,
-        ipnUrl,
-        lang: "vi", requestType, autoCapture: true, extraData, signature
-    };
-
     try {
-        const response = await axios.post(endpoint, requestBody);
-        if (response.data && response.data.payUrl) {
-            res.json({ success: true, payUrl: response.data.payUrl });
-        } else {
-            res.status(400).json({ error: 'Lỗi tạo thanh toán MoMo', details: response.data });
-        }
-    } catch (e) {
-        console.error("Lỗi MoMo:", e.response ? e.response.data : e.message);
-        res.status(500).json({ error: 'Lỗi kết nối MoMo' });
+        const payOS = new PayOS({
+            clientId: payosSettings.clientId,
+            apiKey: payosSettings.apiKey,
+            checksumKey: payosSettings.checksumKey
+        });
+
+        const paymentData = {
+            orderCode: orderCode,
+            amount: pkg.price,
+            description: `Nap WiFi ${pkg.name}`.substring(0, 25),
+            cancelUrl: `${baseUrl}/?error=payment_cancelled`,
+            returnUrl: `${baseUrl}/api/payment/payos/return?orderCode=${orderCode}`
+        };
+
+        const paymentLink = await payOS.paymentRequests.create(paymentData);
+        res.json({ success: true, payUrl: paymentLink.checkoutUrl });
+    } catch (error) {
+        console.error("Lỗi khởi tạo PayOS:", error);
+        res.status(500).json({ error: 'Lỗi kết nối PayOS: ' + error.message });
     }
 });
 
-// Trang giả lập thanh toán MoMo (Dùng khi chưa có API thật)
-app.get('/mock/momo/pay', (req, res) => {
-    const { orderId, amount } = req.query;
+// Trang giả lập thanh toán PayOS (VietQR)
+app.get('/mock/payos/pay', (req, res) => {
+    const { orderCode, amount } = req.query;
     res.send(`
         <html>
-        <head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>MoMo Mock</title></head>
-        <body style="font-family: sans-serif; text-align: center; padding-top: 50px; background: #a50064; color: white;">
-            <h2>MÔI TRƯỜNG THỬ NGHIỆM MOMO</h2>
-            <p>Đơn hàng: ${orderId}</p>
-            <p>Số tiền: ${amount} VNĐ</p>
+        <head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>PayOS Mock</title></head>
+        <body style="font-family: sans-serif; text-align: center; padding-top: 50px; background: #0f172a; color: white;">
+            <h2 style="color: #f97316;">MÔI TRƯỜNG GIẢ LẬP THANH TOÁN PAYOS (VIETQR)</h2>
+            <p>Mã đơn hàng: ${orderCode}</p>
+            <p>Số tiền: ${parseInt(amount).toLocaleString('vi-VN')} VNĐ</p>
             <div style="margin-top: 30px;">
-                <button onclick="window.location.href='/api/payment/momo/return?orderId=${orderId}&resultCode=0'" style="padding: 15px 30px; font-size: 18px; background: #fff; color: #a50064; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
-                    ✅ Giả lập Thanh toán Thành công
+                <button onclick="window.location.href='/api/payment/payos/return?orderCode=${orderCode}'" style="padding: 15px 30px; font-size: 18px; background: #22c55e; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                    ✅ Giả lập Chuyển khoản Thành công
                 </button>
             </div>
             <div style="margin-top: 20px;">
-                <button onclick="window.location.href='/api/payment/momo/return?orderId=${orderId}&resultCode=1006'" style="padding: 10px 20px; font-size: 16px; background: #666; color: #fff; border: none; border-radius: 8px; cursor: pointer;">
+                <button onclick="window.location.href='/?error=payment_cancelled'" style="padding: 10px 20px; font-size: 16px; background: #ef4444; color: #fff; border: none; border-radius: 8px; cursor: pointer;">
                     ❌ Hủy thanh toán
                 </button>
             </div>
@@ -307,66 +297,147 @@ app.get('/mock/momo/pay', (req, res) => {
     `);
 });
 
-// API: Đón người dùng quay lại từ MoMo
-app.get('/api/payment/momo/return', async (req, res) => {
-    const { orderId, resultCode } = req.query;
-    
-    const orderData = orderStorage.get(orderId);
-    if (!orderData) return res.send("Lỗi: Không tìm thấy phiên thanh toán");
-
-    const { sessionId, return_url, packageId } = orderData.extraDataObj;
-
-    if (resultCode !== '0') {
-        // Hủy hoặc lỗi, redirect về trang chủ kèm lỗi
-        return res.redirect(`/?error=payment_failed`);
-    }
+// API: Nhận thông tin thanh toán hoàn tất (Webhook của PayOS)
+app.post('/api/payment/payos/webhook', async (req, res) => {
+    const db = getDb();
+    const payosSettings = db.payos || {};
 
     try {
-        const db = getDb();
-        const groupId = db.ruijie.groupId || "9105026"; 
-        const pkg = db.packages.find(p => p.id === packageId);
-        
-        if (!pkg) {
-            return res.send("Lỗi: Không tìm thấy gói cước đã mua trong hệ thống.");
-        }
-        
-        if (!pkg.ruijieProfileId || !pkg.ruijieUserGroupId) {
-            return res.send("Lỗi hệ thống: Gói cước này chưa được cài đặt Profile ID trên trang Quản trị.");
-        }
+        const payOS = new PayOS({
+            clientId: payosSettings.clientId,
+            apiKey: payosSettings.apiKey,
+            checksumKey: payosSettings.checksumKey
+        });
 
-        // Sinh Voucher VIP nếu chưa sinh
-        let voucherCode = orderData.voucherCode;
-        if (!voucherCode) {
-            voucherCode = await generateVoucher(groupId, pkg.ruijieUserGroupId, pkg.ruijieProfileId);
-            orderStorage.set(orderId, { ...orderData, status: 'success', voucherCode });
+        // Xác minh chữ ký webhook
+        const verifiedData = payOS.webhooks.verify(req.body);
+        const orderCode = verifiedData.orderCode;
+
+        // Xử lý đơn hàng thành công
+        const pending = db.pendingPayments[orderCode];
+        if (pending && pending.status === 'pending') {
+            const groupId = db.ruijie.groupId || "9105026";
+            const pkg = db.packages.find(p => p.id === pending.packageId);
             
-            // Lưu lịch sử
-            db.vouchers.push({
-                id: orderId,
-                voucherCode: voucherCode,
-                customerName: orderData.extraDataObj.customerName || "Không nhập",
-                customerPhone: orderData.extraDataObj.customerPhone || "Không nhập",
-                packageId: packageId,
-                packageName: pkg.name,
-                createdAt: new Date().toISOString(),
-                mac: orderData.extraDataObj.mac || "N/A",
-                method: "momo"
-            });
-            saveDb(db);
+            if (pkg) {
+                const voucherCode = await generateVoucher(groupId, pkg.ruijieUserGroupId, pkg.ruijieProfileId);
+                
+                pending.status = 'success';
+                pending.voucherCode = voucherCode;
+                
+                db.vouchers.push({
+                    id: orderCode.toString(),
+                    voucherCode,
+                    customerName: pending.customerName,
+                    customerPhone: pending.customerPhone,
+                    packageId: pending.packageId,
+                    packageName: pending.packageName,
+                    createdAt: new Date().toISOString(),
+                    mac: pending.mac,
+                    method: "payos_webhook"
+                });
+                
+                saveDb(db);
+                console.log(`[Webhook] Cấp voucher thành công cho đơn hàng ${orderCode}: ${voucherCode}`);
+            }
         }
-
-        // Chuyển hướng về Frontend của chúng ta (App.jsx) để hiển thị mã Voucher
-        // Frontend sẽ nhận các tham số này và hiện nút "Kết nối" để chuyển tiếp đến Ruijie
-        res.redirect(`/?success=true&voucher=${voucherCode}&return_url=${encodeURIComponent(return_url)}&sessionId=${sessionId}`);
-    } catch (e) {
-        res.send("Lỗi khi tạo Voucher VIP: " + e.message);
+        
+        res.status(200).json({ success: true, message: "OK" });
+    } catch (error) {
+        console.error("Lỗi xác minh webhook PayOS:", error.message);
+        res.status(400).send("Invalid signature");
     }
 });
 
-// API: MoMo Webhook (IPN)
-app.post('/api/payment/momo/ipn', async (req, res) => {
-    // Xác minh chữ ký, lấy orderId, sinh voucher lưu vào memory (để returnUrl lấy)
-    res.status(200).json({ message: "OK" });
+// API: Đón người dùng quay lại sau khi thanh toán trên cổng PayOS
+app.get('/api/payment/payos/return', async (req, res) => {
+    const { orderCode } = req.query;
+    
+    let db = getDb();
+    const pending = db.pendingPayments[orderCode];
+    if (!pending) {
+        return res.send("Lỗi: Không tìm thấy phiên thanh toán");
+    }
+
+    // Nếu đã thành công (từ Webhook báo trước)
+    if (pending.status === 'success' && pending.voucherCode) {
+        return res.redirect(`/?success=true&voucher=${pending.voucherCode}&return_url=${encodeURIComponent(pending.returnUrl)}&sessionId=${pending.sessionId}`);
+    }
+
+    const payosSettings = db.payos || {};
+    const useMock = payosSettings.useMock !== undefined ? payosSettings.useMock : false;
+    
+    if (useMock) {
+        const groupId = db.ruijie.groupId || "9105026";
+        const pkg = db.packages.find(p => p.id === pending.packageId);
+        if (pkg) {
+            try {
+                const voucherCode = await generateVoucher(groupId, pkg.ruijieUserGroupId, pkg.ruijieProfileId);
+                pending.status = 'success';
+                pending.voucherCode = voucherCode;
+                
+                db.vouchers.push({
+                    id: orderCode.toString(),
+                    voucherCode,
+                    customerName: pending.customerName,
+                    customerPhone: pending.customerPhone,
+                    packageId: pending.packageId,
+                    packageName: pkg.name,
+                    createdAt: new Date().toISOString(),
+                    mac: pending.mac,
+                    method: "payos_mock"
+                });
+                saveDb(db);
+                return res.redirect(`/?success=true&voucher=${voucherCode}&return_url=${encodeURIComponent(pending.returnUrl)}&sessionId=${pending.sessionId}`);
+            } catch (e) {
+                return res.send("Lỗi tạo voucher giả lập: " + e.message);
+            }
+        }
+    }
+
+    try {
+        const payOS = new PayOS({
+            clientId: payosSettings.clientId,
+            apiKey: payosSettings.apiKey,
+            checksumKey: payosSettings.checksumKey
+        });
+
+        // Chủ động gọi API kiểm tra trạng thái thanh toán trực tiếp từ PayOS (đề phòng webhook trễ)
+        const paymentInfo = await payOS.paymentRequests.getPaymentLinkInformation(orderCode);
+        
+        if (paymentInfo && paymentInfo.status === 'PAID') {
+            if (!pending.voucherCode) {
+                const groupId = db.ruijie.groupId || "9105026";
+                const pkg = db.packages.find(p => p.id === pending.packageId);
+                if (pkg) {
+                    const voucherCode = await generateVoucher(groupId, pkg.ruijieUserGroupId, pkg.ruijieProfileId);
+                    pending.status = 'success';
+                    pending.voucherCode = voucherCode;
+                    
+                    db.vouchers.push({
+                        id: orderCode.toString(),
+                        voucherCode,
+                        customerName: pending.customerName,
+                        customerPhone: pending.customerPhone,
+                        packageId: pending.packageId,
+                        packageName: pkg.name,
+                        createdAt: new Date().toISOString(),
+                        mac: pending.mac,
+                        method: "payos_direct"
+                    });
+                    saveDb(db);
+                    return res.redirect(`/?success=true&voucher=${voucherCode}&return_url=${encodeURIComponent(pending.returnUrl)}&sessionId=${pending.sessionId}`);
+                }
+            } else {
+                return res.redirect(`/?success=true&voucher=${pending.voucherCode}&return_url=${encodeURIComponent(pending.returnUrl)}&sessionId=${pending.sessionId}`);
+            }
+        } else {
+            return res.redirect(`/?error=payment_pending_or_failed`);
+        }
+    } catch (error) {
+        console.error("Lỗi kiểm tra trạng thái thanh toán PayOS:", error);
+        res.send("Có lỗi xảy ra hoặc giao dịch chưa được xác nhận. Vui lòng thử lại.");
+    }
 });
 
 // Render ứng dụng React cho mọi route không phải API
@@ -378,5 +449,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Backend Server đang chạy tại cổng ${PORT}`);
     console.log(`- API Cấp quyền Free: POST http://localhost:${PORT}/api/auth/free`);
-    console.log(`- API Khởi tạo MoMo: POST http://localhost:${PORT}/api/payment/momo`);
+    console.log(`- API Khởi tạo PayOS: POST http://localhost:${PORT}/api/payment/payos`);
 });
