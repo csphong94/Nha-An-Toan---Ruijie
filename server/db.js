@@ -92,6 +92,9 @@ export function getDb() {
 
 export function saveDb(data) {
     try {
+        if (fs.existsSync(DB_FILE)) {
+            fs.copyFileSync(DB_FILE, DB_FILE + '.bak');
+        }
         fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
         return true;
     } catch (err) {

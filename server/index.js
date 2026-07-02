@@ -11,6 +11,11 @@ import { getDb, saveDb } from './db.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const cleanInput = (str) => {
+    if (!str) return '';
+    return String(str).replace(/<[^>]*>/g, '').trim().substring(0, 100);
+};
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -161,12 +166,15 @@ app.post('/api/auth/admin-bypass', async (req, res) => {
         // Sinh Voucher
         const voucherCode = await generateVoucher(groupId, pkg.ruijieUserGroupId, pkg.ruijieProfileId);
         
+        const cleanName = cleanInput(customerName) || "Không nhập";
+        const cleanPhone = cleanInput(customerPhone) || "Không nhập";
+
         // Lưu lịch sử
         db.vouchers.push({
             id: Date.now().toString(),
             voucherCode: voucherCode,
-            customerName: customerName || "Không nhập",
-            customerPhone: customerPhone || "Không nhập",
+            customerName: cleanName,
+            customerPhone: cleanPhone,
             packageId: packageId,
             packageName: pkg.name,
             createdAt: new Date().toISOString(),
@@ -215,8 +223,11 @@ app.post('/api/payment/momo', async (req, res) => {
     const requestId = orderId;
     const requestType = 'captureWallet';
     
+    const cleanName = cleanInput(customerName) || "Không nhập";
+    const cleanPhone = cleanInput(customerPhone) || "Không nhập";
+
     // Gói dữ liệu hệ thống vào extraData (Base64)
-    const extraDataObj = { mac, sessionId, return_url, nas_mac, ssid, packageId, customerName, customerPhone };
+    const extraDataObj = { mac, sessionId, return_url, nas_mac, ssid, packageId, customerName: cleanName, customerPhone: cleanPhone };
     const extraData = Buffer.from(JSON.stringify(extraDataObj)).toString('base64');
     
     // Lưu tạm vào RAM
